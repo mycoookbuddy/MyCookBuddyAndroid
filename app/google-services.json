@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "743724442216",
+    "project_id": "mycookbuddyapp",
+    "storage_bucket": "mycookbuddyapp.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:743724442216:android:5ae4acf5918d7326d991dd",
+        "android_client_info": {
+          "package_name": "com.mycookbuddy.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "743724442216-dedrnu8cf4n7qnsli7cfakehn75hniau.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mycookbuddy.app",
+            "certificate_hash": "86a163368fea28f4b09b0ef5eed5e2fc0e4ce779"
+          }
+        },
+        {
+          "client_id": "743724442216-mrg4ae0ojfjca163g3gm2d62ndcq51kh.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtInRMCqn1w5z4B9eiw0a43azPW0eh9N8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "743724442216-1eorhsh36k7tb0e4m3i9qa7j2duk850m.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
