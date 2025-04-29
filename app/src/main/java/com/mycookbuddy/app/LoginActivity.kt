@@ -62,7 +62,8 @@ class LoginActivity : ComponentActivity() {
         if (userName != null && userEmail != null) {
             val user = hashMapOf(
                 "name" to userName,
-                "email" to userEmail
+                "email" to userEmail,
+                "preferences" to "NOT_SET" // Ensure preferences field is initialized
             )
 
             firestore.collection("users")
@@ -71,13 +72,33 @@ class LoginActivity : ComponentActivity() {
                 .addOnSuccessListener {
                     Log.d("Firestore", "User data successfully written!")
                     Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-                    navigateToSuggestedItems(account)
+                    navigateToNextScreen(account) // Call navigateToNextScreen here
                 }
                 .addOnFailureListener { e ->
                     Log.e("Firestore", "Error writing user data", e)
                     Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
                 }
         }
+    }
+    private fun navigateToNextScreen(account: GoogleSignInAccount) {
+        val userEmail = account.email ?: return
+        firestore.collection("users").document(userEmail).get()
+            .addOnSuccessListener { document ->
+                val preferences = document.getString("preferences") ?: "NOT_SET"
+                if (preferences == "NOT_SET") {
+                    val intent = Intent(this, SettingsActivity::class.java).apply {
+                        putExtra("USER_EMAIL", userEmail)
+                    }
+                    startActivity(intent)
+                } else {
+                    navigateToSuggestedItems(account)
+                }
+                finish()
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error fetching user preferences", e)
+                Toast.makeText(this, "Error fetching user data", Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun navigateToSuggestedItems(account: GoogleSignInAccount) {

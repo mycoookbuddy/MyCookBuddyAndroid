@@ -1,6 +1,7 @@
 package com.mycookbuddy.app
 
 import android.app.DatePickerDialog
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -47,14 +48,12 @@ class AddFoodItemActivity : ComponentActivity() {
             .get()
             .addOnSuccessListener { result ->
                 if (result.documents.isNotEmpty()) {
-                    // Record already exists
                     Toast.makeText(this, "Food item already exists", Toast.LENGTH_SHORT).show()
                 } else {
-                    // Record does not exist, proceed to save
                     val foodItemData = hashMapOf(
                         "name" to foodItem.name,
                         "type" to foodItem.type,
-                        "eatingType" to foodItem.eatingType,
+                        "eatingTypes" to foodItem.eatingTypes,
                         "lastConsumptionDate" to foodItem.lastConsumptionDate,
                         "repeatAfter" to foodItem.repeatAfter,
                         "userEmail" to userEmail
@@ -62,18 +61,26 @@ class AddFoodItemActivity : ComponentActivity() {
 
                     firestore.collection("fooditem")
                         .add(foodItemData)
-                        .addOnSuccessListener {
-                            Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
+                        .addOnSuccessListener { documentReference ->
+                            Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT)
+                                .show()
+                            val intent = Intent().apply {
+                                putExtra("NEW_FOOD_ITEM_ID", documentReference.id)
+                            }
+                            setResult(RESULT_OK, intent)
+                            finish() // Close the activity
                         }
                         .addOnFailureListener { e ->
                             Log.e("Firestore", "Error saving food item", e)
-                            Toast.makeText(this, "Failed to save food item", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, "Failed to save food item", Toast.LENGTH_SHORT)
+                                .show()
                         }
                 }
             }
             .addOnFailureListener { e ->
                 Log.e("Firestore", "Error checking food item existence", e)
-                Toast.makeText(this, "Error checking food item existence", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Error checking food item existence", Toast.LENGTH_SHORT)
+                    .show()
             }
     }
 }
@@ -81,7 +88,7 @@ class AddFoodItemActivity : ComponentActivity() {
 fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("") }
-    var eatingType by remember { mutableStateOf(setOf<String>()) }
+    var eatingTypes by remember { mutableStateOf(setOf<String>()) }
     var lastConsumptionDate by remember { mutableStateOf("") }
     var repeatAfter by remember { mutableStateOf("") }
 
@@ -118,9 +125,9 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
             listOf("Veg", "Non Veg", "Eggy", "Vegan").forEach { type ->
                 Row {
                     RadioButton(
-                        selected = selectedType == type.lowercase(),
+                        selected = selectedType == type,
                         onClick = {
-                            selectedType = type.lowercase()
+                            selectedType = type
                         }
                     )
                     Text(type)
@@ -131,12 +138,12 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
 
         Text("Eating Type")
         Row {
-            listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
+            listOf("Breakfast", "Lunch", "Snacks", "Dinner").forEach { type ->
                 Row {
                     Checkbox(
-                        checked = eatingType.contains(type),
+                        checked = eatingTypes.contains(type),
                         onCheckedChange = {
-                            eatingType = if (it) eatingType + type else eatingType - type
+                            eatingTypes = if (it) eatingTypes + type else eatingTypes - type
                         }
                     )
                     Text(type)
@@ -163,7 +170,7 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
                 FoodItem(
                     name = name,
                     type = selectedType,
-                    eatingType = eatingType.toList(),
+                    eatingTypes = eatingTypes.toList(),
                     lastConsumptionDate = lastConsumptionDate,
                     repeatAfter = repeatAfter.toIntOrNull() ?: 0
                 )
@@ -178,7 +185,8 @@ data class FoodItem(
     var userEmail: String = "",
     val name: String = "",
     val type: String = "",
-    val eatingType: List<String> = emptyList(),
+    val cuisines: List<String> = emptyList(),
+    val eatingTypes: List<String> = emptyList(),
     val lastConsumptionDate: String = "",
     val repeatAfter: Int = 0
 )

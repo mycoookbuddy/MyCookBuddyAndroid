@@ -1,10 +1,14 @@
 package com.mycookbuddy.app
 
+import android.app.Activity.MODE_PRIVATE
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -14,55 +18,105 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 
 class FoodItemListActivity : ComponentActivity() {
+    private lateinit var addFoodItemLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val userEmail = GoogleSignIn.getLastSignedInAccount(this)?.email ?: "unknown@example.com";
+        val userEmail = GoogleSignIn.getLastSignedInAccount(this)?.email ?: "unknown@example.com"
+
+        addFoodItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val newFoodItemId = result.data?.getStringExtra("NEW_FOOD_ITEM_ID")
+                if (newFoodItemId != null) {
+                    refreshFoodItems(userEmail)
+                }
+            }
+        }
 
         setContent {
-            FoodItemListScreen(
-                userEmail = userEmail,
+            FoodItemListScreenWithNavBar(
+                userEmail,
                 onItemClick = { foodItemName ->
                     val intent = Intent(this, FoodItemDetailActivity::class.java).apply {
-
                         putExtra("FOOD_ITEM_NAME", foodItemName)
                     }
-                    startActivity(intent)
+                    this.startActivity(intent)
                 },
                 onAddItemClick = {
                     val intent = Intent(this, AddFoodItemActivity::class.java).apply {
                         putExtra("USER_EMAIL", userEmail)
                     }
-                    startActivity(intent)
+                    addFoodItemLauncher.launch(intent)
                 },
                 onRefreshHomeScreen = { refresh ->
-                    refreshHomeScreen(refresh)
+                    refreshHomeScreen(this, refresh)
                 }
             )
         }
     }
-    private fun refreshHomeScreen(refresh: Boolean)
-    {
-        val sharedPreferences = getSharedPreferences("MyCookBuddyPrefs", MODE_PRIVATE)
-        sharedPreferences.edit() { putBoolean("shouldRefresh", refresh) }
+
+    private fun refreshFoodItems(userEmail: String) {
+        val firestore = FirebaseFirestore.getInstance()
+        fetchFoodItems(firestore, userEmail) { items ->
+            // Logic to scroll to the newly added item can be implemented here if needed
+        }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodItemListScreen(
+fun FoodItemListScreenWithNavBar(
     userEmail: String,
     onItemClick: (String) -> Unit,
     onAddItemClick: () -> Unit,
     onRefreshHomeScreen: (Boolean) -> Unit
-
 ) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add/Edit/Delete Your Food Items") }
+            )
+        },
+        bottomBar = {
+            NavBar(context = LocalContext.current)
+        }
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) {
+            FoodItemListScreenContent(
+                userEmail,
+                onItemClick,
+                onAddItemClick,
+                onRefreshHomeScreen
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FoodItemListScreenContent(
+    userEmail: String,
+    onItemClick: (String) -> Unit,
+    onAddItemClick: () -> Unit,
+    onRefreshHomeScreen: (Boolean) -> Unit
+) {
+    var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
+    val firestore = FirebaseFirestore.getInstance()
+
+    // Fetch food items
+    LaunchedEffect(userEmail) {
+        fetchFoodItems(firestore, userEmail) { items ->
+            foodItems = items
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -75,16 +129,6 @@ fun FoodItemListScreen(
             )
         }
     ) { innerPadding ->
-        var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
-        val firestore = FirebaseFirestore.getInstance()
-
-        // Fetch food items
-        LaunchedEffect(userEmail) {
-            fetchFoodItems(firestore, userEmail) { items ->
-                foodItems = items
-            }
-        }
-
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -107,7 +151,6 @@ fun FoodItemListScreen(
                             .padding(end = 8.dp)
                     )
                     Button(onClick = {
-                        // Delete the food item and refresh the list
                         deleteFoodItem(firestore, id) {
                             onRefreshHomeScreen(true)
                             fetchFoodItems(firestore, userEmail) { items ->
@@ -123,7 +166,11 @@ fun FoodItemListScreen(
     }
 }
 
-// Function to fetch food items
+private fun refreshHomeScreen(context: Context, refresh: Boolean) {
+    val sharedPreferences = context.getSharedPreferences("MyCookBuddyPrefs", MODE_PRIVATE)
+    sharedPreferences.edit { putBoolean("shouldRefresh", refresh) }
+}
+
 private fun fetchFoodItems(
     firestore: FirebaseFirestore,
     userEmail: String,
@@ -144,7 +191,6 @@ private fun fetchFoodItems(
         }
 }
 
-// Function to delete a food item
 private fun deleteFoodItem(
     firestore: FirebaseFirestore,
     documentId: String,

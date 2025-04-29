@@ -92,7 +92,7 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
 ) {
     var personalFoodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
     var generalFoodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
-    var selectedFilter by remember { mutableStateOf("All") }
+    var selectedFoodTypes by remember { mutableStateOf(setOf<String>()) } // Multi-select state
     var selectedEatingTypes by remember { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(userEmail) {
@@ -101,76 +101,100 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
             SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         )
 
-        // Fetch all personal food items (unfiltered)
-        val allPersonalFoodItems = mutableListOf<Pair<String, FoodItem>>()
-        firestore.collection("fooditem")
-            .whereEqualTo("userEmail", userEmail)
-            .get()
-            .addOnSuccessListener { result ->
-                allPersonalFoodItems.addAll(result.documents.mapNotNull { document ->
-                    val foodItem = FoodItem(
-                        name = document["name"] as? String ?: "",
-                        userEmail = document["userEmail"] as? String ?: "",
-                        type = document["type"] as? String ?: "",
-                        eatingType = (document["eatingType"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                        lastConsumptionDate = document["lastConsumptionDate"] as? String ?: "",
-                        repeatAfter = (document["repeatAfter"] as? Long)?.toInt() ?: 0
-                    )
-                    document.id to foodItem
-                })
-
-                // Fetch personal food items filtered by lastConsumptionDate
-                val filteredPersonalItems = result.documents.mapNotNull { document ->
-                    val foodItem = FoodItem(
-                        name = document["name"] as? String ?: "",
-                        userEmail = document["userEmail"] as? String ?: "",
-                        type = document["type"] as? String ?: "",
-                        eatingType = (document["eatingType"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                        lastConsumptionDate = document["lastConsumptionDate"] as? String ?: "",
-                        repeatAfter = (document["repeatAfter"] as? Long)?.toInt() ?: 0
-                    )
-                    val id = document.id
-                    val lastConsumptionDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault())
-                        .parse(foodItem.lastConsumptionDate)
-                    val nextConsumptionDate = Calendar.getInstance().apply {
-                        if (lastConsumptionDate != null) {
-                            time = lastConsumptionDate
-                        }
-                        add(Calendar.DAY_OF_YEAR, foodItem.repeatAfter)
-                    }.time
-                    if (nextConsumptionDate < today) id to foodItem else null
+        // Fetch user preferences
+        var userFoodTypes: List<String>? = null
+        var userCuisines: List<String>? = null
+        firestore.collection("users").document(userEmail).get()
+            .addOnSuccessListener { document ->
+                val preferencesStatus = document.getString("preferences") ?: "NOT_SET"
+                if (preferencesStatus == "SET") {
+                    userFoodTypes = document["foodTypes"] as? List<String>
+                    userCuisines = document["cuisines"] as? List<String>
                 }
-                personalFoodItems = filteredPersonalItems
 
-                // Fetch general food items
-                firestore.collection("commonfooditem")
+                // Fetch all personal food items (unfiltered)
+                val allPersonalFoodItems = mutableListOf<Pair<String, FoodItem>>()
+                firestore.collection("fooditem")
+                    .whereEqualTo("userEmail", userEmail)
                     .get()
-                    .addOnSuccessListener { commonResult ->
-                        val commonItems = commonResult.documents.mapNotNull { document ->
+                    .addOnSuccessListener { result ->
+                        allPersonalFoodItems.addAll(result.documents.mapNotNull { document ->
                             val foodItem = FoodItem(
                                 name = document["name"] as? String ?: "",
-                                userEmail = "", // No userEmail for common items
+                                userEmail = document["userEmail"] as? String ?: "",
                                 type = document["type"] as? String ?: "",
-                                eatingType = (document["eatingType"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
-                                lastConsumptionDate = "", // No lastConsumptionDate for common items
-                                repeatAfter = 0 // No repeatAfter for common items
+                                eatingTypes = (document["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                                lastConsumptionDate = document["lastConsumptionDate"] as? String ?: "",
+                                repeatAfter = (document["repeatAfter"] as? Long)?.toInt() ?: 0
+                            )
+                            document.id to foodItem
+                        })
+
+                        // Fetch personal food items filtered by lastConsumptionDate
+                        val filteredPersonalItems = result.documents.mapNotNull { document ->
+                            val foodItem = FoodItem(
+                                name = document["name"] as? String ?: "",
+                                userEmail = document["userEmail"] as? String ?: "",
+                                type = document["type"] as? String ?: "",
+                                eatingTypes = (document["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                                lastConsumptionDate = document["lastConsumptionDate"] as? String ?: "",
+                                repeatAfter = (document["repeatAfter"] as? Long)?.toInt() ?: 0
                             )
                             val id = document.id
-                            id to foodItem
-                        }
-                        // Exclude items with the same name as in allPersonalFoodItems
-                        generalFoodItems = commonItems.filter { commonItem ->
-                            allPersonalFoodItems.none { personalItem ->
-                                personalItem.second.name.equals(commonItem.second.name, ignoreCase = true)
+                            val lastConsumptionDate: Date? = try {
+                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(foodItem.lastConsumptionDate)
+                            } catch (e: Exception) {
+                                null
                             }
+
+                            val nextConsumptionDate = Calendar.getInstance().apply {
+                                if (lastConsumptionDate != null) {
+                                    time = lastConsumptionDate
+                                }
+                                add(Calendar.DAY_OF_YEAR, foodItem.repeatAfter)
+                            }.time
+                            if (nextConsumptionDate < today) id to foodItem else null
                         }
+                        personalFoodItems = filteredPersonalItems
+
+                        // Fetch general food items
+                        firestore.collection("commonfooditem")
+                            .get()
+                            .addOnSuccessListener { commonResult ->
+                                val commonItems = commonResult.documents.mapNotNull { document ->
+                                    val foodItem = FoodItem(
+                                        name = document["name"] as? String ?: "",
+                                        userEmail = "", // No userEmail for common items
+                                        type = document["type"] as? String ?: "",
+                                        eatingTypes = (document["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                                        lastConsumptionDate = "", // No lastConsumptionDate for common items
+                                        repeatAfter = 0, // No repeatAfter for common items
+                                        cuisines = (document["cuisines"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                                    )
+                                    val id = document.id
+                                    id to foodItem
+                                }
+
+                                // Apply filters based on user preferences
+                                generalFoodItems = if (userFoodTypes != null && userCuisines != null) {
+                                    commonItems.filter { (_, foodItem) ->
+                                        userFoodTypes!!.contains(foodItem.type) &&
+                                        foodItem.cuisines.any { it in userCuisines!! }
+                                    }
+                                } else {
+                                    commonItems
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e("Firestore", "Error fetching common food items", e)
+                            }
                     }
                     .addOnFailureListener { e ->
-                        Log.e("Firestore", "Error fetching common food items", e)
+                        Log.e("Firestore", "Error fetching personal food items", e)
                     }
             }
             .addOnFailureListener { e ->
-                Log.e("Firestore", "Error fetching personal food items", e)
+                Log.e("Firestore", "Error fetching user preferences", e)
             }
     }
 
@@ -189,18 +213,33 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
             modifier = Modifier.padding(bottom = 16.dp)
         )
 
-        // Veg/Non-Veg/All Filter
+        // Food Type Filter (Veg, Non Veg, etc.)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            listOf("All", "Veg", "Non Veg", "Eggy", "Vegan").forEach { filter ->
+            val typeMapping = mapOf(
+                "Veg" to "Veg",
+                "Non Veg" to "Non Veg",
+                "Eggy" to "Eggy",
+                "Vegan" to "Vegan"
+            )
+            typeMapping.keys.forEach { type ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    RadioButton(
-                        selected = selectedFilter == filter,
-                        onClick = { selectedFilter = filter }
+                    Checkbox(
+                        checked = selectedFoodTypes.contains(typeMapping[type] ?: ""),
+                        onCheckedChange = { isChecked ->
+                            val mappedType = typeMapping[type] ?: ""
+                            selectedFoodTypes = if (isChecked) {
+                                selectedFoodTypes + mappedType
+                            } else {
+                                selectedFoodTypes - mappedType
+                            }
+                        }
                     )
-                    Text(text = filter)
+                    Text(text = type)
                 }
             }
         }
@@ -249,7 +288,7 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
                         .padding(8.dp)
                 )
             }
-            items(personalFoodItems.filter { filterFoodItem(it.second, selectedFilter, selectedEatingTypes) }) { (id, foodItem) ->
+            items(personalFoodItems.filter { filterFoodItem(it.second, selectedFoodTypes, selectedEatingTypes) }) { (id, foodItem) ->
                 FoodItemRow(
                     id, foodItem, false, userEmail, onConfirmClick)
             }
@@ -268,7 +307,7 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
                         .padding(8.dp)
                 )
             }
-            items(generalFoodItems.filter { filterFoodItem(it.second, selectedFilter, selectedEatingTypes) }) { (id, foodItem) ->
+            items(generalFoodItems.filter { filterFoodItem(it.second, selectedFoodTypes, selectedEatingTypes) }) { (id, foodItem) ->
                 LocalContext.current
                 FoodItemRow(
                     id = id,
@@ -282,16 +321,14 @@ fun SuggestFoodItemsScreenContent(userEmail: String,
     }
 }
 
-fun filterFoodItem(foodItem: FoodItem, selectedFilter: String, selectedEatingTypes: Set<String>): Boolean {
-    val matchesFilter = when (selectedFilter) {
-        "Veg" -> foodItem.type.equals("veg")
-        "Non Veg" -> foodItem.type.equals("nonveg")
-        "Eggy" -> foodItem.type.equals("eggy")
-        "Vegan" -> foodItem.type.equals("vegan")
-        else -> true
-    }
-    val matchesEatingType = selectedEatingTypes.isEmpty() || foodItem.eatingType.any { it in selectedEatingTypes }
-    return matchesFilter && matchesEatingType
+fun filterFoodItem(
+    foodItem: FoodItem,
+    selectedFoodTypes: Set<String>,
+    selectedEatingTypes: Set<String>
+): Boolean {
+    val matchesFoodType = selectedFoodTypes.isEmpty() || selectedFoodTypes.contains(foodItem.type)
+    val matchesEatingType = selectedEatingTypes.isEmpty() || foodItem.eatingTypes.any { it in selectedEatingTypes }
+    return matchesFoodType && matchesEatingType
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,8 +338,9 @@ fun SuggestFoodItemsScreenWithNavBar(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Suggested Food Items") }
+            CenterAlignedTopAppBar(
+                title = { Text("Home") },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors()
             )
         },
         bottomBar = {
@@ -362,10 +400,10 @@ fun FoodItemRow(
                         .clip(androidx.compose.foundation.shape.CircleShape)
                         .background(
                             when (foodItem.type) {
-                                "veg" -> androidx.compose.ui.graphics.Color.Green
-                                "nonveg" -> androidx.compose.ui.graphics.Color.Red
-                                "eggy" -> androidx.compose.ui.graphics.Color.Yellow
-                                "vegan" -> androidx.compose.ui.graphics.Color.Blue
+                                "Veg" -> androidx.compose.ui.graphics.Color.Green
+                                "Non Veg" -> androidx.compose.ui.graphics.Color.Red
+                                "Eggy" -> androidx.compose.ui.graphics.Color.Yellow
+                                "Vegan" -> androidx.compose.ui.graphics.Color.Blue
                                 else -> androidx.compose.ui.graphics.Color.Gray
                             }
                         )

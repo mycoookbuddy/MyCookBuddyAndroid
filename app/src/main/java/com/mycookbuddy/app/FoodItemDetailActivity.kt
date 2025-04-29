@@ -106,14 +106,14 @@ fun FoodItemDetailScreen(
                             name = data["name"] as? String ?: "",
                             userEmail = data["userEmail"] as? String ?: "",
                             type = data["type"] as? String ?: "",
-                            eatingType = (data["eatingType"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                            eatingTypes = (data["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                             lastConsumptionDate = data["lastConsumptionDate"] as? String ?: "",
                             repeatAfter = (data["repeatAfter"] as? Long)?.toInt() ?: 0
                         )
                     } ?: FoodItem()
                     foodItem = fetchedFoodItem
                     lastConsumptionDate = fetchedFoodItem.lastConsumptionDate
-                    eatingType = fetchedFoodItem.eatingType.toSet()
+                    eatingType = fetchedFoodItem.eatingTypes.toSet()
                     selectedType = fetchedFoodItem.type
                 }
             }
@@ -155,9 +155,9 @@ fun FoodItemDetailScreen(
             listOf("Veg", "Non Veg", "Eggy", "Vegan").forEach { type ->
                 Row {
                     RadioButton(
-                        selected = selectedType == type.lowercase(),
+                        selected = selectedType == type,
                         onClick = {
-                            selectedType = type.lowercase()
+                            selectedType = type
                             foodItem = foodItem.copy(type = selectedType)
                         }
                     )
@@ -172,13 +172,13 @@ fun FoodItemDetailScreen(
 
         Text("Eating Type")
         Row {
-            listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
+            listOf("Breakfast", "Lunch", "Snacks", "Dinner").forEach { type ->
                 Row {
                     Checkbox(
                         checked = eatingType.contains(type),
                         onCheckedChange = {
                             eatingType = if (it) eatingType + type else eatingType - type
-                            foodItem = foodItem.copy(eatingType = eatingType.toList())
+                            foodItem = foodItem.copy(eatingTypes = eatingType.toList())
                         }
                     )
                     Text(type)
