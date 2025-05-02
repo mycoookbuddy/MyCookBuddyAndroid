@@ -5,12 +5,26 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import coil.ImageLoader
+import coil.compose.rememberAsyncImagePainter
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import com.google.android.gms.auth.api.signin.*
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.firestore.Source
 
 class LoginActivity : ComponentActivity() {
 
@@ -20,14 +34,32 @@ class LoginActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Configure Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        // Start the sign-in process
-        signIn()
+        setContent {
+            var isLoading by remember { mutableStateOf(false) }
+            var loadingMessage by remember { mutableStateOf("Loading...") }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                if (isLoading) {
+                    FoodAnimatedLogo(isLoading = isLoading, message = loadingMessage)
+                } else {
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            loadingMessage = "Signing in..."
+                            signIn()
+                        },
+                        modifier = Modifier.align(Alignment.Center)
+                    ) {
+                        Text("Sign In with Google")
+                    }
+                }
+            }
+        }
     }
 
     private fun signIn() {
@@ -58,38 +90,48 @@ class LoginActivity : ComponentActivity() {
 
     private fun saveUserToFirestore(account: GoogleSignInAccount) {
         val userName = account.displayName
-        val userEmail = account.email
-        if (userName != null && userEmail != null) {
-            val user = hashMapOf(
-                "name" to userName,
-                "email" to userEmail,
-                "preferences" to "NOT_SET" // Ensure preferences field is initialized
-            )
+        val userEmail = account.email ?: return
 
-            firestore.collection("users")
-                .document(userEmail)
-                .set(user)
-                .addOnSuccessListener {
-                    Log.d("Firestore", "User data successfully written!")
-                    Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-                    navigateToNextScreen(account) // Call navigateToNextScreen here
+        val user = mutableMapOf<String, Any>(
+            "name" to (userName ?: "User"),
+            "email" to userEmail
+        )
+
+        firestore.collection("users").document(userEmail).get(Source.SERVER)
+            .addOnSuccessListener { document ->
+                if (!document.contains("preferences")) {
+                    user["preferences"] = "NOT_SET"
                 }
-                .addOnFailureListener { e ->
-                    Log.e("Firestore", "Error writing user data", e)
-                    Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
-                }
-        }
+
+                firestore.collection("users")
+                    .document(userEmail)
+                    .set(user, SetOptions.merge())
+                    .addOnSuccessListener {
+                        Log.d("Firestore", "User data successfully merged!")
+                        Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
+                        navigateToNextScreen(account)
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firestore", "Error saving user data", e)
+                        Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
+                    }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error checking existing user data", e)
+                Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
+            }
     }
+
     private fun navigateToNextScreen(account: GoogleSignInAccount) {
         val userEmail = account.email ?: return
-        firestore.collection("users").document(userEmail).get()
+        firestore.collection("users").document(userEmail)
+            .get(Source.SERVER)
             .addOnSuccessListener { document ->
                 val preferences = document.getString("preferences") ?: "NOT_SET"
                 if (preferences == "NOT_SET") {
-                    val intent = Intent(this, SettingsActivity::class.java).apply {
+                    startActivity(Intent(this, SettingsActivity::class.java).apply {
                         putExtra("USER_EMAIL", userEmail)
-                    }
-                    startActivity(intent)
+                    })
                 } else {
                     navigateToSuggestedItems(account)
                 }
@@ -106,10 +148,56 @@ class LoginActivity : ComponentActivity() {
             putExtra("USER_EMAIL", account.email)
         }
         startActivity(intent)
-        finish() // Close LoginActivity
+        finish()
     }
 
     companion object {
         private const val RC_SIGN_IN = 100
+    }
+}
+
+@Composable
+fun FoodAnimatedLogo(isLoading: Boolean, message: String = "Loading...") {
+    if (isLoading) {
+        val context = LocalContext.current
+
+        val imageLoader = ImageLoader.Builder(context)
+            .components {
+                if (android.os.Build.VERSION.SDK_INT >= 28) {
+                    add(ImageDecoderDecoder.Factory())
+                } else {
+                    add(GifDecoder.Factory())
+                }
+            }
+            .build()
+
+        val painter = rememberAsyncImagePainter(
+            model = "android.resource://${context.packageName}/raw/loading",
+            imageLoader = imageLoader
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.6f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Image(
+                    painter = painter,
+                    contentDescription = "Loading",
+                    modifier = Modifier.size(150.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
     }
 }

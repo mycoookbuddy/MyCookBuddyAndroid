@@ -141,7 +141,7 @@ fun deleteAccount(
     GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
         .addOnCompleteListener {
             // Delete user document
-            firestore.collection("user").whereEqualTo("email", userEmail).get()
+            firestore.collection("users").whereEqualTo("email", userEmail).get()
                 .addOnSuccessListener { querySnapshot ->
                     querySnapshot.documents.forEach { it.reference.delete() }
                 }
@@ -158,7 +158,6 @@ fun deleteAccount(
                     querySnapshot.documents.forEach { it.reference.delete() }
                 }
 
-            // Show success message and navigate to MainActivity
             Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
             val intent = Intent(context, MainActivity::class.java)
             context.startActivity(intent)

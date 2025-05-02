@@ -8,9 +8,11 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 class SettingsActivity : ComponentActivity() {
 
@@ -45,7 +47,7 @@ class SettingsActivity : ComponentActivity() {
         )
 
         firestore.collection("users").document(userEmail)
-            .update(userUpdates)
+            .set(userUpdates, SetOptions.merge())  // Safely update without overwriting existing fields
             .addOnSuccessListener {
                 Toast.makeText(this, "Preferences saved successfully", Toast.LENGTH_SHORT).show()
                 val intent = Intent(this, SuggestFoodItemsActivity::class.java).apply {
@@ -59,6 +61,7 @@ class SettingsActivity : ComponentActivity() {
             }
     }
 }
+
 @Composable
 fun SettingsScreen(
     onSave: (List<String>, List<String>) -> Unit,
@@ -88,11 +91,12 @@ fun SettingsScreen(
         // Cuisines Checkboxes
         Text("Cuisines", style = MaterialTheme.typography.titleMedium)
         cuisines.forEach { cuisine ->
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = selectedCuisines.contains(cuisine),
                     onCheckedChange = { isChecked ->
-                        if (isChecked) selectedCuisines.add(cuisine) else selectedCuisines.remove(cuisine)
+                        if (isChecked) selectedCuisines.add(cuisine)
+                        else selectedCuisines.remove(cuisine)
                     }
                 )
                 Text(text = cuisine)
@@ -102,11 +106,12 @@ fun SettingsScreen(
         // Food Types Checkboxes
         Text("Food Types", style = MaterialTheme.typography.titleMedium)
         foodTypes.forEach { foodType ->
-            Row {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(
                     checked = selectedFoodTypes.contains(foodType),
                     onCheckedChange = { isChecked ->
-                        if (isChecked) selectedFoodTypes.add(foodType) else selectedFoodTypes.remove(foodType)
+                        if (isChecked) selectedFoodTypes.add(foodType)
+                        else selectedFoodTypes.remove(foodType)
                     }
                 )
                 Text(text = foodType)
@@ -118,10 +123,10 @@ fun SettingsScreen(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Button(onClick = onSkip) {
+            Button(onClick = { onSkip() }) {
                 Text("Skip")
             }
-            Button(onClick = { onSave(selectedCuisines, selectedFoodTypes) }) {
+            Button(onClick = { onSave(selectedCuisines.toList(), selectedFoodTypes.toList()) }) {
                 Text("Save")
             }
         }

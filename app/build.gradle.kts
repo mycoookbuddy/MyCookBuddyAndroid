@@ -55,6 +55,8 @@ dependencies {
     implementation(libs.androidx.compose.material)
     implementation(libs.firebase.auth.ktx)
     implementation(libs.androidx.navigation.compose)
+    implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation("io.coil-kt:coil-gif:2.4.0")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
