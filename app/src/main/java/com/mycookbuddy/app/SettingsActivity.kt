@@ -11,10 +11,16 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -87,31 +93,27 @@ fun SelectableItem(
     onToggle: () -> Unit,
     selectedColor: Color
 ) {
-    var toggled by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isHovered by interactionSource.collectIsHoveredAsState()
+    val isPressed by interactionSource.collectIsPressedAsState()
+
     val animatedColor by animateColorAsState(
-        targetValue = if (selected) selectedColor else Color(0xFFF4F4F4),
+        targetValue = if (selected) selectedColor else if (isHovered) Color(0xFFE0E0E0) else Color(0xFFF4F4F4),
         animationSpec = tween(300), label = ""
     )
-    val scale by animateFloatAsState(
-        targetValue = if (toggled) 1.05f else 1.0f,
-        animationSpec = tween(500), label = ""
-    )
 
-    LaunchedEffect(selected) {
-        if (selected) {
-            toggled = true
-            delay(500)
-            toggled = false
-        }
-    }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else if (selected) 1.05f else 1.0f,
+        animationSpec = tween(150), label = ""
+    )
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp)
             .scale(scale)
-            .clickable { onToggle() },
-        shape = RoundedCornerShape(12.dp),
+            .clickable(interactionSource = interactionSource, indication = null) { onToggle() },
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = animatedColor)
     ) {
         Row(
@@ -159,10 +161,10 @@ fun SettingsScreen(
     )
 
     val foodTypeColors = mapOf(
-        "Veg" to Color(0xFFC8E6C9),       // light green
-        "Non Veg" to Color(0xFFFFCDD2),   // light red
-        "Eggy" to Color(0xFFFFF9C4),       // light yellow
-        "Vegan" to Color(0xFFDCEDC8)       // soft green
+        "Veg" to Color(0xFFC8E6C9),
+        "Non Veg" to Color(0xFFFFCDD2),
+        "Eggy" to Color(0xFFFFF9C4),
+        "Vegan" to Color(0xFFDCEDC8)
     )
 
     LaunchedEffect(Unit) {
@@ -222,17 +224,23 @@ fun SettingsScreen(
         ) {
             OutlinedButton(
                 onClick = onSkip,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray),
-                border = ButtonDefaults.outlinedButtonBorder
+                shape = RoundedCornerShape(20.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Gray)
             ) {
+                Icon(Icons.Default.Close, contentDescription = "Skip", tint = Color.Gray)
+                Spacer(Modifier.width(8.dp))
                 Text("Skip")
             }
+
             Button(
                 onClick = {
                     onSave(selectedCuisines.toList(), selectedFoodTypes.toList())
                 },
+                shape = RoundedCornerShape(20.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ACC1))
             ) {
+                Icon(Icons.Default.Check, contentDescription = "Save", tint = Color.White)
+                Spacer(Modifier.width(8.dp))
                 Text("Save", color = Color.White)
             }
         }
