@@ -181,12 +181,12 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
     }
 }
 
-data class FoodItem(
-    var userEmail: String = "",
-    val name: String = "",
-    val type: String = "",
-    val cuisines: List<String> = emptyList(),
-    val eatingTypes: List<String> = emptyList(),
-    val lastConsumptionDate: String = "",
-    val repeatAfter: Int = 0
-)
+//data class FoodItem(
+//    var userEmail: String = "",
+//    val name: String = "",
+//    val type: String = "",
+//    val cuisines: List<String> = emptyList(),
+//    val eatingTypes: List<String> = emptyList(),
+//    val lastConsumptionDate: String = "",
+//    val repeatAfter: Int = 0
+//)

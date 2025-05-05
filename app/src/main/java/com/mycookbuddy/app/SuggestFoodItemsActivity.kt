@@ -135,39 +135,11 @@ fun SuggestFoodItemsScreen(userEmail: String) {
                 Icon(Icons.Default.FilterList, contentDescription = "Filter")
             }
         },
-        bottomBar = {
-            NavigationBar(
-                containerColor = Color.White,
-                tonalElevation = 8.dp
-            ) {
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
-                    label = { Text("Home") },
-                    selected = true,
-                    onClick = {}
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.List, contentDescription = "Manage") },
-                    label = { Text("Manage") },
-                    selected = false,
-                    onClick = {}
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Person, contentDescription = "Profile") },
-                    label = { Text("Profile") },
-                    selected = false,
-                    onClick = {}
-                )
-                NavigationBarItem(
-                    icon = { Icon(Icons.Default.Help, contentDescription = "Help") },
-                    label = { Text("Help") },
-                    selected = false,
-                    onClick = {}
-                )
-            }
-        },
         topBar = {
             CenterAlignedTopAppBar(title = { Text("Today's Suggestions") })
+        },
+        bottomBar = {
+            NavBar(context = LocalContext.current)
         }
     ) { padding ->
         LazyColumn(

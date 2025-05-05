@@ -77,6 +77,7 @@ dependencies {
     // Compose date/time dialogs
     implementation("io.github.vanpra.compose-material-dialogs:core:0.9.0")
     implementation("io.github.vanpra.compose-material-dialogs:datetime:0.9.0")
+    implementation(libs.androidx.ui.text.google.fonts)
 
     // Testing
     testImplementation(libs.junit)
