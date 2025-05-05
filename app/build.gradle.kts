@@ -57,6 +57,9 @@ dependencies {
     // ✅ Material3 - REQUIRED for SwipeToDismiss
     implementation(libs.material3)
     implementation(libs.androidx.material.icons.extended)
+    implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
+    implementation("androidx.compose.material3:material3:1.2.1")
+    implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
 
 
     // Firebase and Auth

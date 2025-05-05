@@ -1,72 +1,64 @@
 package com.mycookbuddy.app.ui.theme
 
-import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.font.FontWeight
-import com.mycookbuddy.app.R
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.googlefonts.Font
+import androidx.compose.ui.text.googlefonts.GoogleFont
+import androidx.compose.ui.text.googlefonts.GoogleFont.Provider
 
-// Import Poppins from Font.kt
-import com.mycookbuddy.app.ui.theme.Poppins
-
-private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+private val DarkColors = darkColorScheme(
+    primary = Color(0xFF00ACC1),
+    secondary = Color(0xFF26C6DA),
+    background = Color(0xFF121212),
+    surface = Color(0xFF1E1E1E),
+    onPrimary = Color.White,
+    onSecondary = Color.White,
+    onBackground = Color.White,
+    onSurface = Color.White,
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-)
-
-val AppTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = Poppins,
-        fontWeight = FontWeight.Bold,
-        fontSize = 32.sp
-    ),
-    titleLarge = TextStyle(
-        fontFamily = Poppins,
-        fontWeight = FontWeight.Medium,
-        fontSize = 24.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = Poppins,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = Poppins,
-        fontWeight = FontWeight.Medium,
-        fontSize = 12.sp
-    )
+private val LightColors = lightColorScheme(
+    primary = Color(0xFF00ACC1),
+    secondary = Color(0xFF26C6DA),
+    background = Color(0xFFFFFFFF),
+    surface = Color(0xFFF5F5F5),
+    onPrimary = Color.White,
+    onSecondary = Color.Black,
+    onBackground = Color.Black,
+    onSurface = Color.Black,
 )
 
 @Composable
 fun MyApplicationTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    dynamicColor: Boolean = true,
+    useDarkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
+    val colorScheme = if (useDarkTheme) DarkColors else LightColors
 
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val provider = GoogleFont.Provider(
+        providerAuthority = "com.google.android.gms.fonts",
+        providerPackage = "com.google.android.gms",
+        certificates = com.mycookbuddy.app.R.array.com_google_android_gms_fonts_certs
+    )
+
+    val googleFont = GoogleFont("Poppins")
+    val fontFamily = FontFamily(Font(googleFont, provider))
+
+    val typography = Typography(
+        displayLarge = TextStyle(fontFamily = fontFamily, fontSize = 30.sp),
+        titleMedium = TextStyle(fontFamily = fontFamily, fontSize = 20.sp),
+        bodyLarge = TextStyle(fontFamily = fontFamily, fontSize = 16.sp),
+        labelLarge = TextStyle(fontFamily = fontFamily, fontSize = 14.sp)
+    )
 
     MaterialTheme(
         colorScheme = colorScheme,
-        typography = AppTypography,
+        typography = typography,
         content = content
     )
 }
