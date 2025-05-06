@@ -8,7 +8,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,7 +18,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -61,7 +59,8 @@ fun SuggestFoodItemsScreen(userEmail: String) {
     var personalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
     var generalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
     var personalNames by remember { mutableStateOf(setOf<String>()) }
-    var dialogItem by remember { mutableStateOf<Pair<String, FoodItem>?>(null) }
+
+    val loadingState = remember { mutableStateMapOf<String, Boolean>() }
 
     fun filter(item: FoodItem): Boolean =
         (selectedFoodTypes.isEmpty() || selectedFoodTypes.contains(item.type)) &&
@@ -105,22 +104,37 @@ fun SuggestFoodItemsScreen(userEmail: String) {
     }
 
     fun confirmItem(id: String) {
+        loadingState[id] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         db.collection("fooditem").document(id)
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
                 Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+                loadingState.remove(id)
                 fetch()
             }
     }
 
     fun addGeneral(item: FoodItem) {
+        loadingState[item.name] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         val newItem = item.copy(userEmail = userEmail, lastConsumptionDate = today, repeatAfter = 7)
         db.collection("fooditem").add(newItem).addOnSuccessListener {
             Toast.makeText(context, "Added to personal", Toast.LENGTH_SHORT).show()
             personalNames = personalNames + item.name
             generalItems = generalItems.filter { it.second.name != item.name }
+            loadingState.remove(item.name)
+            fetch()
+        }
+    }
+
+    fun consumeGeneral(item: FoodItem) {
+        loadingState[item.name] = true
+        val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today)).addOnSuccessListener {
+            Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+            generalItems = generalItems.filter { it.second.name != item.name }
+            loadingState.remove(item.name)
         }
     }
 
@@ -149,12 +163,12 @@ fun SuggestFoodItemsScreen(userEmail: String) {
         ) {
             item { GradientHeader("Personal") }
             items(personalItems.filter { filter(it.second) }) { (id, item) ->
-                FoodItemCard(item, false, onConfirm = { confirmItem(id) }, onAdd = {})
+                FoodItemCard(item, false, onConfirm = { confirmItem(id) }, onAdd = {}, isLoading = loadingState[item.name] == true)
             }
 
             item { GradientHeader("General") }
-            items(generalItems.filter { filter(it.second) }) { (id, item) ->
-                FoodItemCard(item, true, onConfirm = {}, onAdd = { dialogItem = id to item })
+            items(generalItems.filter { filter(it.second) }) { (_, item) ->
+                FoodItemCard(item, true, onConfirm = { consumeGeneral(item) }, onAdd = { addGeneral(item) }, isLoading = loadingState[item.name] == true)
             }
         }
     }
@@ -196,37 +210,6 @@ fun SuggestFoodItemsScreen(userEmail: String) {
             }
         }
     }
-
-    dialogItem?.let { (_, item) ->
-        AlertDialog(
-            onDismissRequest = { dialogItem = null },
-            title = { Text(item.name) },
-            text = { Text("Add to personal or mark as consumed?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    addGeneral(item)
-                    dialogItem = null
-                }) {
-                    Icon(Icons.Default.AddCircle, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add to Personal")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-                    db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today))
-                    dialogItem = null
-                    Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
-                    fetch()
-                }) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Consume")
-                }
-            }
-        )
-    }
 }
 
 @Composable
@@ -245,12 +228,9 @@ fun GradientHeader(text: String) {
 }
 
 @Composable
-fun FoodItemCard(item: FoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAdd: () -> Unit) {
+fun FoodItemCard(item: FoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAdd: () -> Unit, isLoading: Boolean) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = isGeneral, onClick = onAdd)
-            .scale(if (!isGeneral) 1.02f else 1f),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(6.dp),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -266,9 +246,18 @@ fun FoodItemCard(item: FoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAd
                     Text("Last: ${item.lastConsumptionDate}", fontSize = 12.sp, color = Color.Gray)
                 }
             }
-            if (!isGeneral) {
-                Button(onClick = onConfirm) {
-                    Text("Confirm")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                } else {
+                    if (isGeneral) {
+                        IconButton(onClick = onAdd) {
+                            Icon(Icons.Default.AddCircle, contentDescription = "Add to Personal", tint = Color(0xFF26A69A))
+                        }
+                    }
+                    IconButton(onClick = onConfirm) {
+                        Icon(Icons.Default.Restaurant, contentDescription = "Ate", tint = Color(0xFFEF5350))
+                    }
                 }
             }
         }
