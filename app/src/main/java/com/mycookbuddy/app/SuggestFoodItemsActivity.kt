@@ -80,8 +80,11 @@ fun SuggestFoodItemsScreen(userEmail: String) {
                     val items = result.documents.mapNotNull { doc ->
                         val item = doc.toObject(FoodItem::class.java)?.copy(name = doc.getString("name") ?: "")
                         val last = doc.getString("lastConsumptionDate")?.let {
-                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
-                        }
+                            if (it.isNotEmpty()) {
+                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
+                            } else {
+                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse("01/01/1970")
+                            }                        }
                         val next = Calendar.getInstance().apply {
                             time = last ?: Date(0)
                             add(Calendar.DAY_OF_YEAR, item?.repeatAfter ?: 0)
@@ -117,8 +120,7 @@ fun SuggestFoodItemsScreen(userEmail: String) {
 
     fun addGeneral(item: FoodItem) {
         loadingState[item.name] = true
-        val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        val newItem = item.copy(userEmail = userEmail, lastConsumptionDate = today, repeatAfter = 7)
+        val newItem = item.copy(userEmail = userEmail, repeatAfter = 7)
         db.collection("fooditem").add(newItem).addOnSuccessListener {
             Toast.makeText(context, "Added to personal", Toast.LENGTH_SHORT).show()
             personalNames = personalNames + item.name
