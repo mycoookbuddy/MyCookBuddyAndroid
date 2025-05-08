@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -91,6 +92,7 @@ fun ProfileScreenContent(
     val context = LocalContext.current
     val firestore = FirebaseFirestore.getInstance()
     var showDialog by remember { mutableStateOf(false) }
+    val photoUrl = GoogleSignIn.getLastSignedInAccount(context)?.photoUrl
 
     Column(
         modifier = Modifier
@@ -99,6 +101,15 @@ fun ProfileScreenContent(
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        if (photoUrl != null) {
+            AsyncImage(
+                model = photoUrl,
+                contentDescription = "User Photo",
+                modifier = Modifier
+                    .size(100.dp)
+                    .padding(bottom = 16.dp)
+            )
+        }
         Text(text = "Hey, $userName!", fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
         Text(text = userEmail, fontSize = 16.sp, modifier = Modifier.padding(bottom = 16.dp))
         Button(onClick = onSignOutClick) {
@@ -141,7 +152,7 @@ fun deleteAccount(
     GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
         .addOnCompleteListener {
             // Delete user document
-            firestore.collection("users").whereEqualTo("email", userEmail).get()
+            firestore.collection("user").whereEqualTo("email", userEmail).get()
                 .addOnSuccessListener { querySnapshot ->
                     querySnapshot.documents.forEach { it.reference.delete() }
                 }
@@ -158,6 +169,7 @@ fun deleteAccount(
                     querySnapshot.documents.forEach { it.reference.delete() }
                 }
 
+            // Show success message and navigate to MainActivity
             Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
             val intent = Intent(context, MainActivity::class.java)
             context.startActivity(intent)

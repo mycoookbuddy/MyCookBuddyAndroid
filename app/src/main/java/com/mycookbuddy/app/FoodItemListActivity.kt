@@ -108,6 +108,8 @@ fun FoodItemListScreenContent(
     onRefreshHomeScreen: (Boolean) -> Unit
 ) {
     var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
+    var showDialog by remember { mutableStateOf(false) }
+    var foodItemIdToDelete by remember { mutableStateOf<String?>(null) }
     val firestore = FirebaseFirestore.getInstance()
 
     // Fetch food items
@@ -151,18 +153,42 @@ fun FoodItemListScreenContent(
                             .padding(end = 8.dp)
                     )
                     Button(onClick = {
-                        deleteFoodItem(firestore, id) {
-                            onRefreshHomeScreen(true)
-                            fetchFoodItems(firestore, userEmail) { items ->
-                                foodItems = items
-                            }
-                        }
+                        foodItemIdToDelete = id
+                        showDialog = true
                     }) {
                         Text("Delete")
                     }
                 }
             }
         }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("Delete Food Item") },
+            text = { Text("Are you sure you want to delete this food item?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    foodItemIdToDelete?.let { id ->
+                        deleteFoodItem(firestore, id) {
+                            onRefreshHomeScreen(true)
+                            fetchFoodItems(firestore, userEmail) { items ->
+                                foodItems = items
+                            }
+                        }
+                    }
+                    showDialog = false
+                }) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
     }
 }
 

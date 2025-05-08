@@ -1,6 +1,5 @@
 package com.mycookbuddy.app
 
-import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -13,11 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
-import java.util.*
+
 
 class AddFoodItemActivity : ComponentActivity() {
 
@@ -89,19 +87,8 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("") }
     var eatingTypes by remember { mutableStateOf(setOf<String>()) }
-    var lastConsumptionDate by remember { mutableStateOf("") }
     var repeatAfter by remember { mutableStateOf("") }
 
-    val calendar = Calendar.getInstance()
-    val datePickerDialog = DatePickerDialog(
-        LocalContext.current,
-        { _, year, month, dayOfMonth ->
-            lastConsumptionDate = "$dayOfMonth/${month + 1}/$year"
-        },
-        calendar.get(Calendar.YEAR),
-        calendar.get(Calendar.MONTH),
-        calendar.get(Calendar.DAY_OF_MONTH)
-    )
 
     Column(
         modifier = Modifier
@@ -151,10 +138,6 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
             }
         }
 
-        Button(onClick = { datePickerDialog.show() }) {
-            Text(text = if (lastConsumptionDate.isEmpty()) "Pick Date" else lastConsumptionDate)
-        }
-
         BasicTextField(
             value = repeatAfter,
             onValueChange = { repeatAfter = it },
@@ -171,7 +154,6 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
                     name = name,
                     type = selectedType,
                     eatingTypes = eatingTypes.toList(),
-                    lastConsumptionDate = lastConsumptionDate,
                     repeatAfter = repeatAfter.toIntOrNull() ?: 0
                 )
             )
@@ -180,13 +162,3 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
         }
     }
 }
-
-//data class FoodItem(
-//    var userEmail: String = "",
-//    val name: String = "",
-//    val type: String = "",
-//    val cuisines: List<String> = emptyList(),
-//    val eatingTypes: List<String> = emptyList(),
-//    val lastConsumptionDate: String = "",
-//    val repeatAfter: Int = 0
-//)

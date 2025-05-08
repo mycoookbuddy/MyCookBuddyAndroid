@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
-import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -49,7 +48,7 @@ class SuggestFoodItemsActivity : ComponentActivity() {
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
-    val scope = rememberCoroutineScope()
+    rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState()
     var showSheet by remember { mutableStateOf(false) }
 
@@ -239,20 +238,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                             selectedCuisines = selectedCuisines.toggle(it)
                         }, label = { Text(it) })
                     }
-                }
-                Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        scope.launch { sheetState.hide() }
-                        showSheet = false
-                        fetch()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ACC1))
-                ) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Apply", color = Color.White)
                 }
             }
         }
