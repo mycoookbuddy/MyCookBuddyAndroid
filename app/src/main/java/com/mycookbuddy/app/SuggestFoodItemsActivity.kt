@@ -28,6 +28,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 
 class SuggestFoodItemsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -146,11 +149,37 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         db.collection("fooditem").document(id)
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
-                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+                val meal = getMealTypeBasedOnTime().first()
+                val itemName = personalItems.find { it.first == id }?.second?.name ?: "your meal"
+                val message = "Hope you enjoyed $itemName in $meal!"
+                val spannable = android.text.SpannableString(message)
+
+                val itemStart = message.indexOf(itemName)
+                if (itemStart >= 0) {
+                    spannable.setSpan(
+                        android.text.style.StyleSpan(android.graphics.Typeface.ITALIC),
+                        itemStart,
+                        itemStart + itemName.length,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+
+                val mealStart = message.indexOf(meal)
+                if (mealStart >= 0) {
+                    spannable.setSpan(
+                        android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                        mealStart,
+                        mealStart + meal.length,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+
+                Toast.makeText(context, spannable, Toast.LENGTH_SHORT).show()
                 loadingState.remove(id)
                 fetch()
             }
     }
+
 
     fun addGeneral(item: FoodItem) {
         loadingState[item.name] = true
@@ -174,38 +203,133 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         }
     }
 
+
     LaunchedEffect(Unit) { fetch() }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary
+            val totalSelected = selectedFoodTypes.size + selectedEatingTypes.size + selectedCuisines.size
+            val totalAvailable = foodTypes.size + eatingTypes.size + userCuisines.size
+
+            BadgedBox(
+                badge = {
+                    if (totalSelected > 0) {
+                        Badge { Text(totalSelected.toString()) }
+                    }
+                }
             ) {
-                Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                FloatingActionButton(
+                    onClick = { showSheet = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                }
             }
         },
         topBar = {
-            val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
-            CenterAlignedTopAppBar(title = { Text(message) })
+            val meal = getMealTypeBasedOnTime().first()
+            val greeting = getWelcomeMessageBasedOnTime()
+
+            TopAppBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))
+                        )
+                    ),
+                title = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Hello, $userName!",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Good $greeting — Enjoy your $meal suggestions!",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                )
+            )
         },
-        bottomBar = {
+
+                bottomBar = {
             NavBar(context = LocalContext.current)
         }
     ) { padding ->
         LazyColumn(
             contentPadding = padding,
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp) // spacing between personal and general
         ) {
-            item { GradientHeader("Personal") }
-            items(personalItems.filter { filterPersonal(it.second) }) { (id, item) ->
-                FoodItemCard(item, false, onConfirm = { confirmItem(id) }, onAdd = {}, isLoading = loadingState[item.name] == true)
+            item {
+                Spacer(modifier = Modifier.height(16.dp)) // space after greeting
+
+                // Personal Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                listOf(Color(0xFF26A69A), Color(0xFF80CBC4))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(16.dp)
+                ) {
+                    Text("Personal", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    personalItems.filter { filterPersonal(it.second) }.forEach { (id, item) ->
+                        FoodItemCard(
+                            item = item,
+                            isGeneral = false,
+                            onConfirm = { confirmItem(id) },
+                            onAdd = {},
+                            isLoading = loadingState[item.name] == true
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
             }
 
-            item { GradientHeader("General") }
-            items(generalItems.filter { filterGeneral(it.second) }) { (_, item) ->
-                FoodItemCard(item, true, onConfirm = { consumeGeneral(item) }, onAdd = { addGeneral(item) }, isLoading = loadingState[item.name] == true)
+            item {
+                // General Section
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.verticalGradient(
+                                listOf(Color(0xFF42A5F5), Color(0xFF90CAF9))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                        .padding(16.dp)
+                ) {
+                    Text("General", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    generalItems.filter { filterGeneral(it.second) }.forEach { (_, item) ->
+                        FoodItemCard(
+                            item = item,
+                            isGeneral = true,
+                            onConfirm = { consumeGeneral(item) },
+                            onAdd = { addGeneral(item) },
+                            isLoading = loadingState[item.name] == true
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                }
             }
         }
     }
