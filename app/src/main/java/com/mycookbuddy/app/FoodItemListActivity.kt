@@ -1,5 +1,5 @@
 // Revamped FoodItemListActivity screen matching rich UI/UX of SuggestFoodItemsActivity
-// Includes gradient top bar, bottom nav, delete confirmation, floating Add button, styled item cards
+// Includes refreshTrigger-based auto-update, gradient top bar, bottom nav, delete confirmation, floating Add button
 
 package com.mycookbuddy.app
 
@@ -8,10 +8,8 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,55 +31,67 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
+import androidx.activity.compose.rememberLauncherForActivityResult
+
 
 class FoodItemListActivity : ComponentActivity() {
-    private lateinit var addFoodItemLauncher: ActivityResultLauncher<Intent>
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val user = GoogleSignIn.getLastSignedInAccount(this)
         val userEmail = user?.email ?: "unknown@example.com"
         val userName = user?.displayName ?: "Guest"
 
-        addFoodItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
-                refreshFoodItems(userEmail)
-            }
-        }
-
         setContent {
+            var refreshTrigger by remember { mutableStateOf(false) }
+
+            val addFoodItemLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                if (result.resultCode == RESULT_OK) {
+                    refreshTrigger = !refreshTrigger
+                }
+            }
+
             MyApplicationTheme {
-                FoodItemListScreen(userEmail, userName, onAdd = {
-                    val intent = Intent(this, AddFoodItemActivity::class.java)
-                    addFoodItemLauncher.launch(intent)
-                }, onClick = { name ->
-                    val intent = Intent(this, FoodItemDetailActivity::class.java)
-                    intent.putExtra("FOOD_ITEM_NAME", name)
-                    startActivity(intent)
-                }, onRefresh = {
-                    refreshHomeScreen(this, true)
-                })
+                FoodItemListScreen(
+                    userEmail = userEmail,
+                    userName = userName,
+                    refreshTrigger = refreshTrigger,
+                    onAdd = {
+                        val intent = Intent(this, AddFoodItemActivity::class.java)
+                        addFoodItemLauncher.launch(intent)
+                    },
+                    onClick = { name ->
+                        val intent = Intent(this, FoodItemDetailActivity::class.java)
+                        intent.putExtra("FOOD_ITEM_NAME", name)
+                        startActivity(intent)
+                    },
+                    onRefresh = {
+                        refreshHomeScreen(this, true)
+                    }
+                )
             }
         }
-    }
-
-    private fun refreshFoodItems(email: String) {
-        FirebaseFirestore.getInstance().collection("fooditem")
-            .whereEqualTo("userEmail", email).get()
-            .addOnSuccessListener {} // not used in this context
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodItemListScreen(userEmail: String, userName: String, onAdd: () -> Unit, onClick: (String) -> Unit, onRefresh: () -> Unit) {
+fun FoodItemListScreen(
+    userEmail: String,
+    userName: String,
+    refreshTrigger: Boolean,
+    onAdd: () -> Unit,
+    onClick: (String) -> Unit,
+    onRefresh: () -> Unit
+) {
     val context = LocalContext.current
     var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
     var showDialog by remember { mutableStateOf(false) }
     var toDeleteId by remember { mutableStateOf<String?>(null) }
     val db = FirebaseFirestore.getInstance()
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(refreshTrigger) {
         fetchFoodItems(db, userEmail) { foodItems = it }
     }
 
@@ -150,8 +160,7 @@ fun FoodItemListScreen(userEmail: String, userName: String, onAdd: () -> Unit, o
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(
                                         onClick = {
-                                            val intent =
-                                                Intent(context, FoodItemDetailActivity::class.java)
+                                            val intent = Intent(context, FoodItemDetailActivity::class.java)
                                             intent.putExtra("FOOD_ITEM_NAME", item.name)
                                             context.startActivity(intent)
                                         },
