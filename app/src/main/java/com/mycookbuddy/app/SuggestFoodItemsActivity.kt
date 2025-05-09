@@ -43,6 +43,48 @@ class SuggestFoodItemsActivity : ComponentActivity() {
     }
 }
 
+fun filterEligiblePersonalFoodItemsForSuggestion(
+    personalItems: List<Pair<String, FoodItem>>,
+    onResult: (List<Pair<String, FoodItem>>) -> Unit
+) {
+    val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(
+        SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+    )
+    val items = personalItems.mapNotNull { personalFoodItem ->
+
+        val last = personalFoodItem.second.lastConsumptionDate.let {
+            if (it.isNotEmpty()) {
+                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
+            } else {
+                SimpleDateFormat(
+                    "dd/MM/yyyy",
+                    Locale.getDefault()
+                ).parse("01/01/1970")
+            }
+        }
+        val next = Calendar.getInstance().apply {
+            time = last ?: Date(0)
+            add(Calendar.DAY_OF_YEAR, personalFoodItem.second.repeatAfter)
+        }.time
+        if (next < today) personalFoodItem else null
+    }
+   onResult(items)
+}
+
+fun fetchPersonalFoodItems(
+    db: FirebaseFirestore,
+    userEmail: String,
+    onResult: (List<Pair<String, FoodItem>>) -> Unit
+) {
+    db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
+        .addOnSuccessListener { personalResult ->
+            val personalItems = personalResult.documents.mapNotNull { doc ->
+                val item = doc.toObject(FoodItem::class.java)
+                if (item != null) doc.id to item else null
+            }
+            onResult(personalItems)
+        }
+}
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
@@ -52,12 +94,12 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     val sheetState = rememberModalBottomSheetState()
     var showSheet by remember { mutableStateOf(false) }
 
-    val foodTypes = listOf("Veg", "Non Veg", "Eggy", "Vegan")
+////    val foodTypes = listOf("Veg", "Non Veg", "Eggy", "Vegan")
     val eatingTypes = listOf("Breakfast", "Lunch", "Snacks", "Dinner")
-    var selectedFoodTypes by remember { mutableStateOf(foodTypes.toSet()) }
+ //   var selectedFoodTypes by remember { mutableStateOf(foodTypes.toSet()) }
     var selectedEatingTypes by remember { mutableStateOf(eatingTypes.toSet()) }
-    var userCuisines by remember { mutableStateOf(setOf<String>()) }
-    var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
+//    var userCuisines by remember { mutableStateOf(setOf<String>()) }
+ //   var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
     var personalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
     var generalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
@@ -85,40 +127,34 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         }
     }
 
-    fun filterGeneral(item: FoodItem): Boolean =
-        (selectedFoodTypes.isNotEmpty() && selectedFoodTypes.contains(item.type)) &&
-        (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes }) &&
-        (selectedCuisines.isNotEmpty() && item.cuisines.any { it in selectedCuisines })
+//    fun filterGeneral(item: FoodItem): Boolean =
+//        (selectedFoodTypes.isNotEmpty() && selectedFoodTypes.contains(item.type)) &&
+//                (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes }) &&
+//                (selectedCuisines.isNotEmpty() && item.cuisines.any { it in selectedCuisines })
 
     fun filterPersonal(item: FoodItem): Boolean =
-        (selectedFoodTypes.isNotEmpty() && selectedFoodTypes.contains(item.type)) &&
         (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes })
 
     fun fetch() {
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(
             SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         )
-        db.collection("users").document(userEmail).get().addOnSuccessListener { userDoc ->
-            if (userDoc.getString("preferences") != "SET") return@addOnSuccessListener
-            val foodPrefs = userDoc["foodTypes"] as? List<String> ?: listOf()
-            val cuisines = userDoc["cuisines"] as? List<String> ?: listOf()
-
-            userCuisines = cuisines.toSet()
-            selectedCuisines = userCuisines
-
-            selectedFoodTypes = foodPrefs.toSet()
-            selectedEatingTypes = getMealTypeBasedOnTime()
 
             db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
                 .addOnSuccessListener { result ->
                     val items = result.documents.mapNotNull { doc ->
-                        val item = doc.toObject(FoodItem::class.java)?.copy(name = doc.getString("name") ?: "")
+                        val item = doc.toObject(FoodItem::class.java)
+                            ?.copy(name = doc.getString("name") ?: "")
                         val last = doc.getString("lastConsumptionDate")?.let {
                             if (it.isNotEmpty()) {
                                 SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
                             } else {
-                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse("01/01/1970")
-                            }                        }
+                                SimpleDateFormat(
+                                    "dd/MM/yyyy",
+                                    Locale.getDefault()
+                                ).parse("01/01/1970")
+                            }
+                        }
                         val next = Calendar.getInstance().apply {
                             time = last ?: Date(0)
                             add(Calendar.DAY_OF_YEAR, item?.repeatAfter ?: 0)
@@ -128,16 +164,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                     personalItems = items
                     personalNames = items.map { it.second.name }.toSet()
 
-                    db.collection("commonfooditem").get().addOnSuccessListener { common ->
-                        generalItems = common.documents.mapNotNull { doc ->
-                            val item = doc.toObject(FoodItem::class.java)?.copy(name = doc.getString("name") ?: "")
-                            if (item != null && foodPrefs.contains(item.type) && item.cuisines.any { it in cuisines }) {
-                                doc.id to item
-                            } else null
-                        }.filter { it.second.name !in personalNames }
-                    }
                 }
-        }
+
     }
 
     fun confirmItem(id: String) {
@@ -167,15 +195,36 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     fun consumeGeneral(item: FoodItem) {
         loadingState[item.name] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today)).addOnSuccessListener {
-            Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
-            generalItems = generalItems.filter { it.second.name != item.name }
-            loadingState.remove(item.name)
+        db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today))
+            .addOnSuccessListener {
+                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+                generalItems = generalItems.filter { it.second.name != item.name }
+                loadingState.remove(item.name)
+            }
+    }
+
+    var isLoading by remember { mutableStateOf(true) }
+    // Fetch data only once
+    LaunchedEffect(Unit) {
+        isLoading = true
+        fetchPersonalFoodItems(db, userEmail) { personal ->
+            filterEligiblePersonalFoodItemsForSuggestion(
+                personal)  { personalFiltered ->
+                personalItems = personalFiltered
+                isLoading = false
+            }
         }
     }
 
-    LaunchedEffect(Unit) { fetch() }
-
+    if (isLoading) {
+        // Show loading indicator
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+    } else {
     Scaffold(
         floatingActionButton = {
             FloatingActionButton(
@@ -186,7 +235,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             }
         },
         topBar = {
-            val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
+            val message =
+                "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
             CenterAlignedTopAppBar(title = { Text(message) })
         },
         bottomBar = {
@@ -198,30 +248,24 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { GradientHeader("Personal") }
+
             items(personalItems.filter { filterPersonal(it.second) }) { (id, item) ->
-                FoodItemCard(item, false, onConfirm = { confirmItem(id) }, onAdd = {}, isLoading = loadingState[item.name] == true)
+                FoodItemCard(
+                    item,
+                    false,
+                    onConfirm = { confirmItem(id) },
+                    onAdd = {},
+                    isLoading = loadingState[item.name] == true
+                )
             }
 
-            item { GradientHeader("General") }
-            items(generalItems.filter { filterGeneral(it.second) }) { (_, item) ->
-                FoodItemCard(item, true, onConfirm = { consumeGeneral(item) }, onAdd = { addGeneral(item) }, isLoading = loadingState[item.name] == true)
-            }
         }
     }
-
+}
     AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
         ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = sheetState) {
             Column(Modifier.padding(16.dp)) {
-                Text("Food Type", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    foodTypes.forEach {
-                        FilterChip(selected = selectedFoodTypes.contains(it), onClick = {
-                            selectedFoodTypes = selectedFoodTypes.toggle(it)
-                        }, label = { Text(it) })
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
+
                 Text("When to Eat", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     eatingTypes.forEach {
@@ -230,15 +274,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         }, label = { Text(it) })
                     }
                 }
-                Spacer(Modifier.height(12.dp))
-                Text("Cuisine", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    userCuisines.forEach {
-                        FilterChip(selected = selectedCuisines.contains(it), onClick = {
-                            selectedCuisines = selectedCuisines.toggle(it)
-                        }, label = { Text(it) })
-                    }
-                }
+
             }
         }
     }

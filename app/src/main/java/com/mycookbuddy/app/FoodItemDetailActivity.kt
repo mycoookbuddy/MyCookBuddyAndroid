@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import java.util.Calendar
 
 class FoodItemDetailActivity : ComponentActivity() {
@@ -38,10 +39,6 @@ class FoodItemDetailActivity : ComponentActivity() {
         }
     }
 
-    private fun refreshHomeScreen(refresh: Boolean) {
-        val sharedPreferences = getSharedPreferences("MyCookBuddyPrefs", MODE_PRIVATE)
-        sharedPreferences.edit { putBoolean("shouldRefresh", refresh) }
-    }
 
     private fun saveFoodItemToFirestore(foodItem: FoodItem, userEmail: String, originalName: String) {
         firestore.collection("fooditem")
@@ -56,7 +53,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                         .set(foodItem)
                         .addOnSuccessListener {
                             Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
-                            refreshHomeScreen(true)
+                            refreshHomeScreen(this,true)
                         }
                         .addOnFailureListener { e ->
                             Log.e("Firestore", "Error updating food item", e)
@@ -68,7 +65,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                         .add(newFoodItem)
                         .addOnSuccessListener {
                             Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
-                            refreshHomeScreen(true)
+                            refreshHomeScreen(this,true)
                         }
                         .addOnFailureListener { e ->
                             Log.e("Firestore", "Error saving new food item", e)

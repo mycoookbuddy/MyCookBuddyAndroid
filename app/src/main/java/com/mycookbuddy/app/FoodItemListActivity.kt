@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 
 class FoodItemListActivity : ComponentActivity() {
     private lateinit var addFoodItemLauncher: ActivityResultLauncher<Intent>
@@ -192,10 +193,6 @@ fun FoodItemListScreenContent(
     }
 }
 
-private fun refreshHomeScreen(context: Context, refresh: Boolean) {
-    val sharedPreferences = context.getSharedPreferences("MyCookBuddyPrefs", MODE_PRIVATE)
-    sharedPreferences.edit { putBoolean("shouldRefresh", refresh) }
-}
 
 private fun fetchFoodItems(
     firestore: FirebaseFirestore,

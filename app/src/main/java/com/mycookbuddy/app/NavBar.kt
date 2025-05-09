@@ -7,6 +7,7 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -21,6 +22,7 @@ fun NavBar(
     NavigationBar {
         val navItems = listOf(
             "Home" to MainActivity::class.java,
+            "Search" to SearchInventoryActivity::class.java,
             "Manage" to FoodItemListActivity::class.java,
             "Profile" to ProfileActivity::class.java,
             "Help" to HelpActivity::class.java
@@ -39,6 +41,7 @@ fun NavBar(
                     Icon(
                         imageVector = when (label) {
                             "Home" -> Icons.Default.Home
+                            "Search" -> Icons.Default.Search
                             "Manage" -> Icons.AutoMirrored.Filled.List
                             "Profile" -> Icons.Default.Person
                             "Help" -> Icons.Default.Info

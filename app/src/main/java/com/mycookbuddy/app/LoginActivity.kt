@@ -129,9 +129,7 @@ class LoginActivity : ComponentActivity() {
             .addOnSuccessListener { document ->
                 val preferences = document.getString("preferences") ?: "NOT_SET"
                 if (preferences == "NOT_SET") {
-                    startActivity(Intent(this, SettingsActivity::class.java).apply {
-                        putExtra("USER_EMAIL", userEmail)
-                    })
+                    startActivity(Intent(this, SettingsActivity::class.java))
                 } else {
                     navigateToSuggestedItems(account)
                 }
