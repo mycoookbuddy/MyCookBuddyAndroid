@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
@@ -40,7 +39,7 @@ class FoodItemDetailActivity : ComponentActivity() {
     }
 
 
-    private fun saveFoodItemToFirestore(foodItem: FoodItem, userEmail: String, originalName: String) {
+    private fun saveFoodItemToFirestore(foodItem: PersonalFoodItem, userEmail: String, originalName: String) {
         firestore.collection("fooditem")
             .whereEqualTo("userEmail", userEmail)
             .whereEqualTo("name", originalName)
@@ -83,9 +82,9 @@ class FoodItemDetailActivity : ComponentActivity() {
 fun FoodItemDetailScreen(
     userEmail: String,
     foodItemName: String,
-    onSaveClick: (FoodItem) -> Unit
+    onSaveClick: (PersonalFoodItem) -> Unit
 ) {
-    var foodItem by remember { mutableStateOf(FoodItem()) }
+    var foodItem by remember { mutableStateOf(PersonalFoodItem()) }
     var lastConsumptionDate by remember { mutableStateOf("") }
     var eatingType by remember { mutableStateOf(setOf<String>()) }
     var selectedType by remember { mutableStateOf("") }
@@ -99,7 +98,7 @@ fun FoodItemDetailScreen(
             .addOnSuccessListener { result ->
                 if (result.documents.isNotEmpty()) {
                     val fetchedFoodItem = result.documents[0].data?.let { data ->
-                        FoodItem(
+                        PersonalFoodItem(
                             name = data["name"] as? String ?: "",
                             userEmail = data["userEmail"] as? String ?: "",
                             type = data["type"] as? String ?: "",
@@ -107,7 +106,7 @@ fun FoodItemDetailScreen(
                             lastConsumptionDate = data["lastConsumptionDate"] as? String ?: "",
                             repeatAfter = (data["repeatAfter"] as? Long)?.toInt() ?: 0
                         )
-                    } ?: FoodItem()
+                    } ?: PersonalFoodItem()
                     foodItem = fetchedFoodItem
                     lastConsumptionDate = fetchedFoodItem.lastConsumptionDate
                     eatingType = fetchedFoodItem.eatingTypes.toSet()

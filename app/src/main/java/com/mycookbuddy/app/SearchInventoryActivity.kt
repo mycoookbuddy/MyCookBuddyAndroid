@@ -38,8 +38,8 @@ class SearchInventoryActivity : ComponentActivity() {
     @Composable
     fun SearchInventoryScreen(userEmail: String) {
         val scope = rememberCoroutineScope()
-        var allItems by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
-        var filteredItems by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+        var allItems by remember { mutableStateOf<List<CommonFoodItem>>(emptyList()) }
+        var filteredItems by remember { mutableStateOf<List<CommonFoodItem>>(emptyList()) }
         var selectedMealTypes by remember { mutableStateOf(setOf("Breakfast", "Lunch", "Snacks", "Dinner")) }
         var selectedFoodTypes by remember { mutableStateOf(setOf("Veg", "Non Veg", "Eggy", "Vegan")) }
         var selectedCuisines by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -57,7 +57,7 @@ class SearchInventoryActivity : ComponentActivity() {
             // Fetch all items from /commonfooditem
             firestore.collection("commonfooditem").get()
                 .addOnSuccessListener { commonItems ->
-                    val commonFoodItems = commonItems.documents.mapNotNull { it.toObject(FoodItem::class.java) }
+                    val commonFoodItems = commonItems.documents.mapNotNull { it.toObject(CommonFoodItem::class.java) }
 
                     // Fetch user's existing items from /fooditem
                     firestore.collection("fooditem")
@@ -172,12 +172,12 @@ class SearchInventoryActivity : ComponentActivity() {
     }
 
     private fun updateFilteredItems(
-        allItems: List<FoodItem>,
+        allItems: List<CommonFoodItem>,
         selectedMealTypes: Set<String>,
         selectedFoodTypes: Set<String>,
         selectedCuisines: Set<String>,
         searchText: String,
-        onUpdate: (List<FoodItem>) -> Unit
+        onUpdate: (List<CommonFoodItem>) -> Unit
     ) {
         val filtered = allItems.filter { item ->
             (item.type in selectedFoodTypes) &&
@@ -192,8 +192,15 @@ class SearchInventoryActivity : ComponentActivity() {
         return if (set.contains(item)) set - item else set + item
     }
 
-    private fun addItemToUserCollection(userEmail: String, item: FoodItem) {
-        val newItem = item.copy(userEmail = userEmail)
+    private fun addItemToUserCollection(userEmail: String, item: CommonFoodItem) {
+        val newItem = PersonalFoodItem(
+            name = item.name,
+            userEmail = userEmail,
+            type = item.type,
+            eatingTypes = item.eatingTypes,
+            lastConsumptionDate = "",
+            repeatAfter = 7
+        )
         firestore.collection("fooditem")
             .whereEqualTo("userEmail", userEmail)
             .whereEqualTo("name", item.name)

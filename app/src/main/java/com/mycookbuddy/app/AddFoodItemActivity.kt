@@ -34,7 +34,7 @@ class AddFoodItemActivity : ComponentActivity() {
         }
     }
 
-    private fun saveFoodItemToFirestore(foodItem: FoodItem, userEmail: String) {
+    private fun saveFoodItemToFirestore(foodItem: PersonalFoodItem, userEmail: String) {
         if (foodItem.name.isBlank() || foodItem.type.isBlank()) {
             Toast.makeText(this, "Name and Veg/Non-Veg are mandatory", Toast.LENGTH_SHORT).show()
             return
@@ -83,7 +83,7 @@ class AddFoodItemActivity : ComponentActivity() {
     }
 }
 @Composable
-fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
+fun AddFoodItemScreen(onSaveClick: (PersonalFoodItem) -> Unit) {
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("") }
     var eatingTypes by remember { mutableStateOf(setOf<String>()) }
@@ -150,7 +150,7 @@ fun AddFoodItemScreen(onSaveClick: (FoodItem) -> Unit) {
 
         Button(onClick = {
             onSaveClick(
-                FoodItem(
+                PersonalFoodItem(
                     name = name,
                     type = selectedType,
                     eatingTypes = eatingTypes.toList(),

@@ -1,7 +1,5 @@
 package com.mycookbuddy.app
 
-import android.app.Activity.MODE_PRIVATE
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -20,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
@@ -108,7 +105,7 @@ fun FoodItemListScreenContent(
     onAddItemClick: () -> Unit,
     onRefreshHomeScreen: (Boolean) -> Unit
 ) {
-    var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
+    var foodItems by remember { mutableStateOf<List<Pair<String, PersonalFoodItem>>>(emptyList()) }
     var showDialog by remember { mutableStateOf(false) }
     var foodItemIdToDelete by remember { mutableStateOf<String?>(null) }
     val firestore = FirebaseFirestore.getInstance()
@@ -197,14 +194,14 @@ fun FoodItemListScreenContent(
 private fun fetchFoodItems(
     firestore: FirebaseFirestore,
     userEmail: String,
-    onResult: (List<Pair<String, FoodItem>>) -> Unit
+    onResult: (List<Pair<String, PersonalFoodItem>>) -> Unit
 ) {
     firestore.collection("fooditem")
         .whereEqualTo("userEmail", userEmail)
         .get()
         .addOnSuccessListener { result ->
             val items = result.documents.mapNotNull { doc ->
-                val foodItem = doc.toObject(FoodItem::class.java)
+                val foodItem = doc.toObject(PersonalFoodItem::class.java)
                 if (foodItem != null) doc.id to foodItem else null
             }
             onResult(items)

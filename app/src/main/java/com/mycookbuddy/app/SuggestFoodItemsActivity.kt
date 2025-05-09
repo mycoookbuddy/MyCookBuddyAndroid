@@ -44,8 +44,8 @@ class SuggestFoodItemsActivity : ComponentActivity() {
 }
 
 fun filterEligiblePersonalFoodItemsForSuggestion(
-    personalItems: List<Pair<String, FoodItem>>,
-    onResult: (List<Pair<String, FoodItem>>) -> Unit
+    personalItems: List<Pair<String, PersonalFoodItem>>,
+    onResult: (List<Pair<String, PersonalFoodItem>>) -> Unit
 ) {
     val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
@@ -74,12 +74,12 @@ fun filterEligiblePersonalFoodItemsForSuggestion(
 fun fetchPersonalFoodItems(
     db: FirebaseFirestore,
     userEmail: String,
-    onResult: (List<Pair<String, FoodItem>>) -> Unit
+    onResult: (List<Pair<String, PersonalFoodItem>>) -> Unit
 ) {
     db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
         .addOnSuccessListener { personalResult ->
             val personalItems = personalResult.documents.mapNotNull { doc ->
-                val item = doc.toObject(FoodItem::class.java)
+                val item = doc.toObject(PersonalFoodItem::class.java)
                 if (item != null) doc.id to item else null
             }
             onResult(personalItems)
@@ -101,8 +101,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 //    var userCuisines by remember { mutableStateOf(setOf<String>()) }
  //   var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
-    var personalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
-    var generalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
+    var personalItems by remember { mutableStateOf(listOf<Pair<String, PersonalFoodItem>>()) }
+    var generalItems by remember { mutableStateOf(listOf<Pair<String, PersonalFoodItem>>()) }
     var personalNames by remember { mutableStateOf(setOf<String>()) }
 
     val loadingState = remember { mutableStateMapOf<String, Boolean>() }
@@ -132,7 +132,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 //                (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes }) &&
 //                (selectedCuisines.isNotEmpty() && item.cuisines.any { it in selectedCuisines })
 
-    fun filterPersonal(item: FoodItem): Boolean =
+    fun filterPersonal(item: PersonalFoodItem): Boolean =
         (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes })
 
     fun fetch() {
@@ -143,7 +143,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
                 .addOnSuccessListener { result ->
                     val items = result.documents.mapNotNull { doc ->
-                        val item = doc.toObject(FoodItem::class.java)
+                        val item = doc.toObject(PersonalFoodItem::class.java)
                             ?.copy(name = doc.getString("name") ?: "")
                         val last = doc.getString("lastConsumptionDate")?.let {
                             if (it.isNotEmpty()) {
@@ -180,7 +180,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             }
     }
 
-    fun addGeneral(item: FoodItem) {
+    fun addGeneral(item: PersonalFoodItem) {
         loadingState[item.name] = true
         val newItem = item.copy(userEmail = userEmail, repeatAfter = 7)
         db.collection("fooditem").add(newItem).addOnSuccessListener {
@@ -192,7 +192,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         }
     }
 
-    fun consumeGeneral(item: FoodItem) {
+    fun consumeGeneral(item: PersonalFoodItem) {
         loadingState[item.name] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today))
@@ -296,7 +296,7 @@ fun GradientHeader(text: String) {
 }
 
 @Composable
-fun FoodItemCard(item: FoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAdd: () -> Unit, isLoading: Boolean) {
+fun FoodItemCard(item: PersonalFoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAdd: () -> Unit, isLoading: Boolean) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(6.dp),
