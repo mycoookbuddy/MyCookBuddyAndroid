@@ -1,7 +1,8 @@
+// Revamped FoodItemListActivity screen matching rich UI/UX of SuggestFoodItemsActivity
+// Includes gradient top bar, bottom nav, delete confirmation, floating Add button, styled item cards
+
 package com.mycookbuddy.app
 
-import android.app.Activity.MODE_PRIVATE
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -9,175 +10,194 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.core.content.edit
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
+import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 
 class FoodItemListActivity : ComponentActivity() {
     private lateinit var addFoodItemLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val userEmail = GoogleSignIn.getLastSignedInAccount(this)?.email ?: "unknown@example.com"
+        val user = GoogleSignIn.getLastSignedInAccount(this)
+        val userEmail = user?.email ?: "unknown@example.com"
+        val userName = user?.displayName ?: "Guest"
 
         addFoodItemLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode == RESULT_OK) {
-                val newFoodItemId = result.data?.getStringExtra("NEW_FOOD_ITEM_ID")
-                if (newFoodItemId != null) {
-                    refreshFoodItems(userEmail)
-                }
+                refreshFoodItems(userEmail)
             }
         }
 
         setContent {
-            FoodItemListScreenWithNavBar(
-                userEmail,
-                onItemClick = { foodItemName ->
-                    val intent = Intent(this, FoodItemDetailActivity::class.java).apply {
-                        putExtra("FOOD_ITEM_NAME", foodItemName)
-                    }
-                    this.startActivity(intent)
-                },
-                onAddItemClick = {
-                    val intent = Intent(this, AddFoodItemActivity::class.java).apply {
-                        putExtra("USER_EMAIL", userEmail)
-                    }
+            MyApplicationTheme {
+                FoodItemListScreen(userEmail, userName, onAdd = {
+                    val intent = Intent(this, AddFoodItemActivity::class.java)
                     addFoodItemLauncher.launch(intent)
-                },
-                onRefreshHomeScreen = { refresh ->
-                    refreshHomeScreen(this, refresh)
-                }
-            )
+                }, onClick = { name ->
+                    val intent = Intent(this, FoodItemDetailActivity::class.java)
+                    intent.putExtra("FOOD_ITEM_NAME", name)
+                    startActivity(intent)
+                }, onRefresh = {
+                    refreshHomeScreen(this, true)
+                })
+            }
         }
     }
 
-    private fun refreshFoodItems(userEmail: String) {
-        val firestore = FirebaseFirestore.getInstance()
-        fetchFoodItems(firestore, userEmail) { items ->
-            // Logic to scroll to the newly added item can be implemented here if needed
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun FoodItemListScreenWithNavBar(
-    userEmail: String,
-    onItemClick: (String) -> Unit,
-    onAddItemClick: () -> Unit,
-    onRefreshHomeScreen: (Boolean) -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Add/Edit/Delete Your Food Items") }
-            )
-        },
-        bottomBar = {
-            NavBar(context = LocalContext.current)
-        }
-    ) { innerPadding ->
-        Box(modifier = Modifier.padding(innerPadding)) {
-            FoodItemListScreenContent(
-                userEmail,
-                onItemClick,
-                onAddItemClick,
-                onRefreshHomeScreen
-            )
-        }
+    private fun refreshFoodItems(email: String) {
+        FirebaseFirestore.getInstance().collection("fooditem")
+            .whereEqualTo("userEmail", email).get()
+            .addOnSuccessListener {} // not used in this context
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FoodItemListScreenContent(
-    userEmail: String,
-    onItemClick: (String) -> Unit,
-    onAddItemClick: () -> Unit,
-    onRefreshHomeScreen: (Boolean) -> Unit
-) {
+fun FoodItemListScreen(userEmail: String, userName: String, onAdd: () -> Unit, onClick: (String) -> Unit, onRefresh: () -> Unit) {
+    val context = LocalContext.current
     var foodItems by remember { mutableStateOf<List<Pair<String, FoodItem>>>(emptyList()) }
     var showDialog by remember { mutableStateOf(false) }
-    var foodItemIdToDelete by remember { mutableStateOf<String?>(null) }
-    val firestore = FirebaseFirestore.getInstance()
+    var toDeleteId by remember { mutableStateOf<String?>(null) }
+    val db = FirebaseFirestore.getInstance()
 
-    // Fetch food items
-    LaunchedEffect(userEmail) {
-        fetchFoodItems(firestore, userEmail) { items ->
-            foodItems = items
-        }
+    LaunchedEffect(Unit) {
+        fetchFoodItems(db, userEmail) { foodItems = it }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Food Items") },
-                actions = {
-                    IconButton(onClick = onAddItemClick) {
-                        Icon(Icons.Filled.Add, contentDescription = "Add Food Item")
+                modifier = Modifier.background(
+                    Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA)))
+                ),
+                title = {
+                    Column {
+                        Text("Hello, $userName!", color = Color.White, fontWeight = FontWeight.Bold)
+                        Text("Manage your food items", color = Color.White.copy(alpha = 0.9f), fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAdd, containerColor = MaterialTheme.colorScheme.primary) {
+                Icon(Icons.Default.Add, contentDescription = "Add")
+            }
+        },
+        bottomBar = {
+            NavBar(context = context)
         }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(foodItems) { (id, foodItem) ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = foodItem.name,
+    ) { padding ->
+        Column(modifier = Modifier.padding(padding)) {
+            Spacer(modifier = Modifier.height(12.dp))
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(foodItems) { (id, item) ->
+                    Card(
                         modifier = Modifier
-                            .weight(1f)
-                            .clickable { onItemClick(foodItem.name) }
-                            .padding(end = 8.dp)
-                    )
-                    Button(onClick = {
-                        foodItemIdToDelete = id
-                        showDialog = true
-                    }) {
-                        Text("Delete")
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        elevation = CardDefaults.cardElevation(6.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(Color(0xFFE0F7FA), Color.White)
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .padding(horizontal = 12.dp, vertical = 10.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    item.name,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            val intent =
+                                                Intent(context, FoodItemDetailActivity::class.java)
+                                            intent.putExtra("FOOD_ITEM_NAME", item.name)
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Edit",
+                                            tint = Color(0xFF1976D2),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+
+                                    IconButton(
+                                        onClick = {
+                                            toDeleteId = id
+                                            showDialog = true
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete",
+                                            tint = Color.Red,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if (showDialog) {
+    if (showDialog && toDeleteId != null) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
             title = { Text("Delete Food Item") },
-            text = { Text("Are you sure you want to delete this food item?") },
+            text = { Text("Are you sure you want to delete this item?") },
             confirmButton = {
                 TextButton(onClick = {
-                    foodItemIdToDelete?.let { id ->
-                        deleteFoodItem(firestore, id) {
-                            onRefreshHomeScreen(true)
-                            fetchFoodItems(firestore, userEmail) { items ->
-                                foodItems = items
-                            }
-                        }
+                    deleteFoodItem(db, toDeleteId!!) {
+                        onRefresh()
+                        fetchFoodItems(db, userEmail) { foodItems = it }
                     }
                     showDialog = false
                 }) {
@@ -193,40 +213,21 @@ fun FoodItemListScreenContent(
     }
 }
 
-
-private fun fetchFoodItems(
-    firestore: FirebaseFirestore,
-    userEmail: String,
-    onResult: (List<Pair<String, FoodItem>>) -> Unit
-) {
-    firestore.collection("fooditem")
+private fun fetchFoodItems(db: FirebaseFirestore, userEmail: String, onResult: (List<Pair<String, FoodItem>>) -> Unit) {
+    db.collection("fooditem")
         .whereEqualTo("userEmail", userEmail)
         .get()
         .addOnSuccessListener { result ->
             val items = result.documents.mapNotNull { doc ->
-                val foodItem = doc.toObject(FoodItem::class.java)
-                if (foodItem != null) doc.id to foodItem else null
+                val item = doc.toObject(FoodItem::class.java)
+                if (item != null) doc.id to item else null
             }
             onResult(items)
         }
-        .addOnFailureListener { e ->
-            Log.e("Firestore", "Error fetching food items", e)
-        }
 }
 
-private fun deleteFoodItem(
-    firestore: FirebaseFirestore,
-    documentId: String,
-    onComplete: () -> Unit
-) {
-    firestore.collection("fooditem")
-        .document(documentId)
-        .delete()
-        .addOnSuccessListener {
-            Log.d("Firestore", "Food item deleted successfully")
-            onComplete()
-        }
-        .addOnFailureListener { e ->
-            Log.e("Firestore", "Error deleting food item", e)
-        }
+private fun deleteFoodItem(db: FirebaseFirestore, id: String, onSuccess: () -> Unit) {
+    db.collection("fooditem").document(id).delete()
+        .addOnSuccessListener { onSuccess() }
+        .addOnFailureListener { Log.e("Firestore", "Delete failed", it) }
 }
