@@ -33,7 +33,6 @@ import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import androidx.activity.compose.rememberLauncherForActivityResult
 
-
 class FoodItemListActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,7 +63,7 @@ class FoodItemListActivity : ComponentActivity() {
                     onClick = { name ->
                         val intent = Intent(this, FoodItemDetailActivity::class.java)
                         intent.putExtra("FOOD_ITEM_NAME", name)
-                        startActivity(intent)
+                        addFoodItemLauncher.launch(intent) // Updated to trigger refresh
                     },
                     onRefresh = {
                         refreshHomeScreen(this, true)
@@ -160,9 +159,7 @@ fun FoodItemListScreen(
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     IconButton(
                                         onClick = {
-                                            val intent = Intent(context, FoodItemDetailActivity::class.java)
-                                            intent.putExtra("FOOD_ITEM_NAME", item.name)
-                                            context.startActivity(intent)
+                                            onClick(item.name)
                                         },
                                         modifier = Modifier.size(36.dp)
                                     ) {
