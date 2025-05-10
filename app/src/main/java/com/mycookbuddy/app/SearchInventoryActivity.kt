@@ -1,6 +1,3 @@
-// Redesigned version of SearchInventoryActivity matching SuggestFoodItemsActivity
-// Includes: Top bar, bottom nav bar, floating filter button, modal filters, gradient headers
-
 package com.mycookbuddy.app
 
 import android.icu.util.Calendar
@@ -288,27 +285,34 @@ private fun toggleSelection(set: Set<String>, item: String): Set<String> {
     return if (set.contains(item)) set - item else set + item
 }
 
-private fun addItemToUserCollection(userEmail: String, item: FoodItem) {
-    val newItem = item.copy(userEmail = userEmail)
-    firestore.collection("fooditem")
-        .whereEqualTo("userEmail", userEmail)
-        .whereEqualTo("name", item.name)
-        .get()
-        .addOnSuccessListener { result ->
-            if (result.isEmpty) {
-                firestore.collection("fooditem").add(newItem)
-                    .addOnSuccessListener {
-                        Toast.makeText(this, "${item.name} added successfully to personal list.", Toast.LENGTH_SHORT).show()
-                        refreshHomeScreen(this,true)
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(this, "Failed to add item: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-            } else {
-                Toast.makeText(this, "${item.name} is already in your collection", Toast.LENGTH_SHORT).show()
+    private fun addItemToUserCollection(userEmail: String, item: CommonFoodItem) {
+        val newItem = Fooditem(
+            name = item.name,
+            userEmail = userEmail,
+            type = item.type,
+            eatingTypes = item.eatingTypes,
+            lastConsumptionDate = "",
+            repeatAfter = 7
+        )
+        firestore.collection("fooditem")
+            .whereEqualTo("userEmail", userEmail)
+            .whereEqualTo("name", item.name)
+            .get()
+            .addOnSuccessListener { result ->
+                if (result.isEmpty) {
+                    firestore.collection("fooditem").add(newItem)
+                        .addOnSuccessListener {
+                            Toast.makeText(this, "${item.name} added successfully", Toast.LENGTH_SHORT).show()
+                            refreshHomeScreen(this,true)
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Failed to add item: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                } else {
+                    Toast.makeText(this, "${item.name} is already in your collection", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
-}
+    }
 }
 
 

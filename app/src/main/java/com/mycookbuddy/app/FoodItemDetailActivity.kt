@@ -1,5 +1,3 @@
-// Revamped FoodItemDetailActivity screen with top/bottom bars, rich UI styling, and input enhancements
-
 package com.mycookbuddy.app
 
 import android.app.DatePickerDialog
@@ -26,8 +24,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
@@ -145,6 +143,9 @@ fun FoodItemDetailScreen(
                     eatingType = foodItem.eatingTypes.toSet()
                     selectedType = foodItem.type
                 }
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error fetching food item details", e)
             }
     }
 

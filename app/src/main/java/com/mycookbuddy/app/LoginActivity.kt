@@ -6,24 +6,18 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import coil.ImageLoader
-import coil.compose.rememberAsyncImagePainter
-import coil.decode.GifDecoder
-import coil.decode.ImageDecoderDecoder
-import com.google.android.gms.auth.api.signin.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.Source
 
 class LoginActivity : ComponentActivity() {
@@ -40,23 +34,39 @@ class LoginActivity : ComponentActivity() {
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setContent {
-            var isLoading by remember { mutableStateOf(false) }
-            var loadingMessage by remember { mutableStateOf("Loading...") }
+            LoginScreen()
+        }
+    }
+@Composable
+fun LoadingIndicator(message: String) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        CircularProgressIndicator()
+        Spacer(modifier = Modifier.height(16.dp))
+        Text(message, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+    @Composable
+    fun LoginScreen() {
+        var isLoading by remember { mutableStateOf(false) }
+        var loadingMessage by remember { mutableStateOf("Loading...") }
 
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (isLoading) {
-                    FoodAnimatedLogo(isLoading = isLoading, message = loadingMessage)
-                } else {
-                    Button(
-                        onClick = {
-                            isLoading = true
-                            loadingMessage = "Signing in..."
-                            signIn()
-                        },
-                        modifier = Modifier.align(Alignment.Center)
-                    ) {
-                        Text("Sign In with Google")
-                    }
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (isLoading) {
+                LoadingIndicator(message = loadingMessage)
+            } else {
+                Button(
+                    onClick = {
+                        isLoading = true
+                        loadingMessage = "Signing in..."
+                        signIn()
+                    },
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Text("Sign In with Google")
                 }
             }
         }
@@ -80,12 +90,135 @@ class LoginActivity : ComponentActivity() {
             val account = completedTask.getResult(Exception::class.java)
             Log.d("GoogleSignIn", "Signed in as: ${account?.displayName}")
             if (account != null) {
-                saveUserToFirestore(account)
+                val userEmail = account.email ?: return
+
+                firestore.collection("users").document(userEmail).get()
+                    .addOnSuccessListener { document ->
+                        if (document.exists()) {
+                            val privacyPolicyAccepted = document.getBoolean("privacyPolicy") ?: false
+                            if (!privacyPolicyAccepted) {
+                                setContent {
+                                    var showDialog by remember { mutableStateOf(false) }
+
+                                    PrivacyPolicyScreen(
+                                        userEmail = userEmail,
+                                        onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
+                                        onReject = { showDialog = true }
+                                    )
+
+                                    if (showDialog) {
+                                        RejectConfirmationDialog(
+                                            onConfirm = { logOutUser() },
+                                            onDismiss = { showDialog = false }
+                                        )
+                                    }
+                                }
+                            } else {
+                                navigateToNextScreen(account)
+                            }
+                        } else {
+                            saveUserToFirestore(account)
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firestore", "Error checking user data", e)
+                        Toast.makeText(this, "Error checking user data", Toast.LENGTH_SHORT).show()
+                    }
             }
         } catch (e: Exception) {
             Log.e("GoogleSignIn", "Sign-in failed", e)
             Toast.makeText(this, "Sign-in failed", Toast.LENGTH_SHORT).show()
         }
+    }
+
+  @Composable
+  fun PrivacyPolicyScreen(
+      userEmail: String,
+      onAccept: () -> Unit,
+      onReject: () -> Unit
+  ) {
+      var showDialog by remember { mutableStateOf(false) }
+
+      if (showDialog) {
+          AlertDialog(
+              onDismissRequest = { showDialog = false },
+              title = { Text("Confirmation") },
+              text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
+              confirmButton = {
+                  Button(onClick = {
+                      showDialog = false
+                      onReject()
+                  }) {
+                      Text("Reject")
+                  }
+              },
+              dismissButton = {
+                  Button(onClick = { showDialog = false }) {
+                      Text("Cancel")
+                  }
+              }
+          )
+      }
+
+      Column(
+          modifier = Modifier.fillMaxSize().padding(16.dp),
+          horizontalAlignment = Alignment.CenterHorizontally,
+          verticalArrangement = Arrangement.Center
+      ) {
+          Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
+          Spacer(modifier = Modifier.height(16.dp))
+          Text("Privacy policy content goes here...")
+          Spacer(modifier = Modifier.height(16.dp))
+          Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+              Button(onClick = onAccept) {
+                  Text("Accept")
+              }
+              Button(onClick = { showDialog = true }) {
+                  Text("Reject")
+              }
+          }
+      }
+  }
+
+    @Composable
+    fun RejectConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Confirmation") },
+            text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
+            confirmButton = {
+                Button(onClick = onConfirm) {
+                    Text("Reject")
+                }
+            },
+            dismissButton = {
+                Button(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    private fun updatePrivacyPolicyFlag(userEmail: String, account: GoogleSignInAccount) {
+        firestore.collection("users").document(userEmail)
+            .update("privacyPolicy", true)
+            .addOnSuccessListener {
+                Toast.makeText(this, "Privacy Policy Accepted", Toast.LENGTH_SHORT).show()
+                navigateToNextScreen(account)
+            }
+            .addOnFailureListener { e ->
+                Log.e("Firestore", "Error updating privacy policy", e)
+                Toast.makeText(this, "Error updating privacy policy", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun logOutUser() {
+        GoogleSignIn.getClient(this, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
+            .addOnCompleteListener {
+                Toast.makeText(this, "You have been logged out", Toast.LENGTH_SHORT).show()
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+            }
     }
 
     private fun saveUserToFirestore(account: GoogleSignInAccount) {
@@ -94,30 +227,33 @@ class LoginActivity : ComponentActivity() {
 
         val user = mutableMapOf<String, Any>(
             "name" to (userName ?: "User"),
-            "email" to userEmail
+            "email" to userEmail,
+            "privacyPolicy" to false
         )
 
-        firestore.collection("users").document(userEmail).get(Source.SERVER)
-            .addOnSuccessListener { document ->
-                if (!document.contains("preferences")) {
-                    user["preferences"] = "NOT_SET"
-                }
+        firestore.collection("users").document(userEmail)
+            .set(user)
+            .addOnSuccessListener {
+                Log.d("Firestore", "User data successfully saved!")
+                setContent {
+                    var showDialog by remember { mutableStateOf(false) }
 
-                firestore.collection("users")
-                    .document(userEmail)
-                    .set(user, SetOptions.merge())
-                    .addOnSuccessListener {
-                        Log.d("Firestore", "User data successfully merged!")
-                        Toast.makeText(this, "Login successful!", Toast.LENGTH_SHORT).show()
-                        navigateToNextScreen(account)
+                    PrivacyPolicyScreen(
+                        userEmail = userEmail,
+                        onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
+                        onReject = { showDialog = true }
+                    )
+
+                    if (showDialog) {
+                        RejectConfirmationDialog(
+                            onConfirm = { logOutUser() },
+                            onDismiss = { showDialog = false }
+                        )
                     }
-                    .addOnFailureListener { e ->
-                        Log.e("Firestore", "Error saving user data", e)
-                        Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
-                    }
+                }
             }
             .addOnFailureListener { e ->
-                Log.e("Firestore", "Error checking existing user data", e)
+                Log.e("Firestore", "Error saving user data", e)
                 Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
             }
     }
@@ -151,51 +287,5 @@ class LoginActivity : ComponentActivity() {
 
     companion object {
         private const val RC_SIGN_IN = 100
-    }
-}
-
-@Composable
-fun FoodAnimatedLogo(isLoading: Boolean, message: String = "Loading...") {
-    if (isLoading) {
-        val context = LocalContext.current
-
-        val imageLoader = ImageLoader.Builder(context)
-            .components {
-                if (android.os.Build.VERSION.SDK_INT >= 28) {
-                    add(ImageDecoderDecoder.Factory())
-                } else {
-                    add(GifDecoder.Factory())
-                }
-            }
-            .build()
-
-        val painter = rememberAsyncImagePainter(
-            model = "android.resource://${context.packageName}/raw/loading",
-            imageLoader = imageLoader
-        )
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.6f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Image(
-                    painter = painter,
-                    contentDescription = "Loading",
-                    modifier = Modifier.size(150.dp)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
     }
 }

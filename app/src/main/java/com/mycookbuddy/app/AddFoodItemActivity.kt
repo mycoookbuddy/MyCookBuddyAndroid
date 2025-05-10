@@ -58,6 +58,15 @@ class AddFoodItemActivity : ComponentActivity() {
                 if (result.documents.isNotEmpty()) {
                     Toast.makeText(this, "Food item already exists", Toast.LENGTH_SHORT).show()
                 } else {
+                    val foodItemData = hashMapOf(
+                        "name" to foodItem.name,
+                        "type" to foodItem.type,
+                        "eatingTypes" to foodItem.eatingTypes,
+                        "lastConsumptionDate" to foodItem.lastConsumptionDate,
+                        "repeatAfter" to foodItem.repeatAfter,
+                        "userEmail" to userEmail
+                    )
+
                     firestore.collection("fooditem")
                         .add(foodItem.copy(userEmail = userEmail))
                         .addOnSuccessListener { documentReference ->

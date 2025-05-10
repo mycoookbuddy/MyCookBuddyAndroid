@@ -8,8 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -20,22 +18,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
-import com.mycookbuddy.app.R
-import kotlinx.coroutines.delay
 
 class SettingsActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
@@ -77,7 +71,7 @@ class SettingsActivity : ComponentActivity() {
                     .get()
                     .addOnSuccessListener { result ->
                         val foodItems = result.documents.mapNotNull { doc ->
-                            doc.toObject(FoodItem::class.java)?.copy(userEmail = userEmail)
+                            doc.toObject(PersonalFoodItem::class.java)?.copy(userEmail = userEmail)
                         }
 
                         // Step 3: Check for duplicates in /fooditem collection

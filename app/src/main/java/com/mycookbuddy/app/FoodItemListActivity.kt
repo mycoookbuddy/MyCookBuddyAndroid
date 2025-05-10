@@ -1,6 +1,3 @@
-// Revamped FoodItemListActivity screen matching rich UI/UX of SuggestFoodItemsActivity
-// Includes refreshTrigger-based auto-update, gradient top bar, bottom nav, delete confirmation, floating Add button
-
 package com.mycookbuddy.app
 
 import android.content.Intent
@@ -229,6 +226,9 @@ private fun fetchFoodItems(db: FirebaseFirestore, userEmail: String, onResult: (
                 if (item != null) doc.id to item else null
             }
             onResult(items)
+        }
+        .addOnFailureListener { e ->
+            Log.e("Firestore", "Error fetching food items", e)
         }
 }
 
