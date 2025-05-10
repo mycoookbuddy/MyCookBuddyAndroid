@@ -256,11 +256,30 @@ fun LoadingIndicator(message: String) {
     private fun saveUserToFirestore(account: GoogleSignInAccount) {
         val userName = account.displayName
         val userEmail = account.email ?: return
+        // Define the default notifications
 
+        val defaultNotifications = listOf(
+            mapOf(
+                "mealType" to "Breakfast",
+                "status" to true,
+                "timestamp" to "7:30 AM"
+            ),
+            mapOf(
+                "mealType" to "Lunch",
+                "status" to true,
+                "timestamp" to "01:30 PM"
+            ),
+            mapOf(
+                "mealType" to "Dinner",
+                "status" to true,
+                "timestamp" to "7:30 PM"
+            )
+        )
         val user = mutableMapOf<String, Any>(
             "name" to (userName ?: "User"),
             "email" to userEmail,
-            "privacyPolicy" to false
+            "privacyPolicy" to false,
+            "notifications" to defaultNotifications
         )
 
         firestore.collection("users").document(userEmail)

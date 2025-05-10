@@ -63,6 +63,11 @@ class ProfileActivity : ComponentActivity() {
                         intent.putExtra("USER_EMAIL", userEmail)
                         startActivity(intent)
                     },
+                    onEditNotificationsClick = {
+                        val intent = Intent(this, NotificationSettingsActivity::class.java)
+                        intent.putExtra("USER_EMAIL", userEmail)
+                        startActivity(intent)
+                    },
                     onSignOutClick = {
                         googleSignInClient.signOut().addOnCompleteListener {
                             Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
@@ -106,6 +111,7 @@ fun ProfileScreenWithNavBar(
     userEmail: String,
     userPhotoUrl: String,
     onEditPreferenceClick: () -> Unit,
+    onEditNotificationsClick: () -> Unit,
     onSignOutClick: () -> Unit,
     onDeleteAccountClick: () -> Unit
 ) {
@@ -120,6 +126,7 @@ fun ProfileScreenWithNavBar(
                 userEmail = userEmail,
                 userPhotoUrl = userPhotoUrl,
                 onEditPreferenceClick = onEditPreferenceClick,
+                onEditNotificationsClick = onEditNotificationsClick,
                 onSignOutClick = onSignOutClick,
                 onDeleteAccountClick = onDeleteAccountClick
             )
@@ -133,6 +140,7 @@ fun ProfileScreenContent(
     userEmail: String,
     userPhotoUrl: String,
     onEditPreferenceClick: () -> Unit,
+    onEditNotificationsClick: () -> Unit,
     onSignOutClick: () -> Unit,
     onDeleteAccountClick: () -> Unit
 ) {
@@ -156,11 +164,18 @@ fun ProfileScreenContent(
         Text(userEmail, fontSize = 16.sp, color = Color.Gray)
         Spacer(modifier = Modifier.height(24.dp))
 
+//        ProfileOptionCard(
+//            icon = Icons.Default.Restaurant,
+//            label = "Edit Food Preference",
+//            iconTint = Color(0xFF7B1FA2),
+//            onClick = onEditPreferenceClick
+//        )
+//        Spacer(modifier = Modifier.height(12.dp))
         ProfileOptionCard(
-            icon = Icons.Default.Restaurant,
-            label = "Edit Food Preference",
-            iconTint = Color(0xFF7B1FA2),
-            onClick = onEditPreferenceClick
+            icon = Icons.Default.Notifications,
+            label = "Edit Notifications",
+            iconTint = Color(0xFF0288D1),
+            onClick = onEditNotificationsClick
         )
         Spacer(modifier = Modifier.height(12.dp))
         ProfileOptionCard(
@@ -180,7 +195,12 @@ fun ProfileScreenContent(
 }
 
 @Composable
-fun ProfileOptionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, iconTint: Color, onClick: () -> Unit) {
+fun ProfileOptionCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    iconTint: Color,
+    onClick: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -200,7 +220,12 @@ fun ProfileOptionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, lab
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             }
-            Icon(Icons.Default.ArrowForwardIos, contentDescription = "Arrow", tint = Color.LightGray, modifier = Modifier.size(16.dp))
+            Icon(
+                Icons.Default.ArrowForwardIos,
+                contentDescription = "Arrow",
+                tint = Color.LightGray,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
