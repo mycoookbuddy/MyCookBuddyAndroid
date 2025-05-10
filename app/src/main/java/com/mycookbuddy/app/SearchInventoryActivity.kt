@@ -1,6 +1,3 @@
-// Redesigned version of SearchInventoryActivity matching SuggestFoodItemsActivity
-// Includes: Top bar, bottom nav bar, floating filter button, modal filters, gradient headers
-
 package com.mycookbuddy.app
 
 import android.icu.util.Calendar
@@ -17,7 +14,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +30,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.FlowRow
@@ -66,8 +61,8 @@ class SearchInventoryActivity : ComponentActivity() {
         val sheetState = rememberModalBottomSheetState()
         var showSheet by remember { mutableStateOf(false) }
 
-        var allItems by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
-        var filteredItems by remember { mutableStateOf<List<FoodItem>>(emptyList()) }
+        var allItems by remember { mutableStateOf<List< CommonFoodItem>>(emptyList()) }
+        var filteredItems by remember { mutableStateOf<List<CommonFoodItem>>(emptyList()) }
         var searchText by remember { mutableStateOf(TextFieldValue("")) }
         var cuisines by remember { mutableStateOf<List<String>>(emptyList()) }
         var selectedMealTypes by remember { mutableStateOf(setOf("Breakfast", "Lunch", "Snacks", "Dinner")) }
@@ -83,7 +78,8 @@ class SearchInventoryActivity : ComponentActivity() {
 
             firestore.collection("commonfooditem").get()
                 .addOnSuccessListener { commonItems ->
-                    val commonFoodItems = commonItems.documents.mapNotNull { it.toObject(FoodItem::class.java) }
+                    val commonFoodItems = commonItems.documents.mapNotNull { it.toObject(
+                        CommonFoodItem::class.java) }
                     firestore.collection("fooditem")
                         .whereEqualTo("userEmail", userEmail)
                         .get()
@@ -268,12 +264,12 @@ AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
 }
 
 private fun updateFilteredItems(
-    allItems: List<FoodItem>,
+    allItems: List<CommonFoodItem>,
     selectedMealTypes: Set<String>,
     selectedFoodTypes: Set<String>,
     selectedCuisines: Set<String>,
     searchText: String,
-    onUpdate: (List<FoodItem>) -> Unit
+    onUpdate: (List<CommonFoodItem>) -> Unit
 ) {
     val filtered = allItems.filter { item ->
         (item.type in selectedFoodTypes) &&
@@ -288,27 +284,34 @@ private fun toggleSelection(set: Set<String>, item: String): Set<String> {
     return if (set.contains(item)) set - item else set + item
 }
 
-private fun addItemToUserCollection(userEmail: String, item: FoodItem) {
-    val newItem = item.copy(userEmail = userEmail)
-    firestore.collection("fooditem")
-        .whereEqualTo("userEmail", userEmail)
-        .whereEqualTo("name", item.name)
-        .get()
-        .addOnSuccessListener { result ->
-            if (result.isEmpty) {
-                firestore.collection("fooditem").add(newItem)
-                    .addOnSuccessListener {
-                        Toast.makeText(this, "${item.name} added successfully to personal list.", Toast.LENGTH_SHORT).show()
-                        refreshHomeScreen(this,true)
-                    }
-                    .addOnFailureListener { e ->
-                        Toast.makeText(this, "Failed to add item: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-            } else {
-                Toast.makeText(this, "${item.name} is already in your collection", Toast.LENGTH_SHORT).show()
+    private fun addItemToUserCollection(userEmail: String, item: CommonFoodItem) {
+        val newItem = FoodItem(
+            name = item.name,
+            userEmail = userEmail,
+            type = item.type,
+            eatingTypes = item.eatingTypes,
+            lastConsumptionDate = "",
+            repeatAfter = 7
+        )
+        firestore.collection("fooditem")
+            .whereEqualTo("userEmail", userEmail)
+            .whereEqualTo("name", item.name)
+            .get()
+            .addOnSuccessListener { result ->
+                if (result.isEmpty) {
+                    firestore.collection("fooditem").add(newItem)
+                        .addOnSuccessListener {
+                            Toast.makeText(this, "${item.name} added successfully", Toast.LENGTH_SHORT).show()
+                            refreshHomeScreen(this,true)
+                        }
+                        .addOnFailureListener { e ->
+                            Toast.makeText(this, "Failed to add item: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                } else {
+                    Toast.makeText(this, "${item.name} is already in your collection", Toast.LENGTH_SHORT).show()
+                }
             }
-        }
-}
+    }
 }
 
 
