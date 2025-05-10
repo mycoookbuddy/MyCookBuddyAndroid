@@ -6,12 +6,25 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
@@ -19,65 +32,96 @@ import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 
 class ProfileActivity : ComponentActivity() {
-
     private lateinit var googleSignInClient: GoogleSignInClient
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val userEmail = GoogleSignIn.getLastSignedInAccount(this)?.email ?: "unknown@example.com"
-        val userName = GoogleSignIn.getLastSignedInAccount(this)?.displayName ?: "Unknown User"
+        val user = GoogleSignIn.getLastSignedInAccount(this)
+        val userEmail = user?.email ?: "unknown@example.com"
+        val userName = user?.displayName ?: "Unknown User"
+        val userPhoto = user?.photoUrl
 
-        // Configure Google Sign-In
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .build()
         googleSignInClient = GoogleSignIn.getClient(this, gso)
 
         setContent {
-            ProfileScreenWithNavBar(
-                userName,
-                userEmail,
-                { signOut() }
-            )
-        }
-    }
+            MyApplicationTheme {
+                var showDeleteDialog by remember { mutableStateOf(false) }
 
-    private fun signOut() {
-        googleSignInClient.signOut()
-            .addOnCompleteListener(this) {
-                Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
-                val intent = Intent(this, MainActivity::class.java)
-                startActivity(intent)
-                finish() // Close ProfileActivity
+                ProfileScreenWithNavBar(
+                    userName = userName,
+                    userEmail = userEmail,
+                    userPhotoUrl = userPhoto?.toString() ?: "",
+                    onEditPreferenceClick = {
+                        val intent = Intent(this, SettingsActivity::class.java)
+                        intent.putExtra("USER_EMAIL", userEmail)
+                        startActivity(intent)
+                    },
+                    onSignOutClick = {
+                        googleSignInClient.signOut().addOnCompleteListener {
+                            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                            startActivity(Intent(this, MainActivity::class.java))
+                            finish()
+                        }
+                    },
+                    onDeleteAccountClick = {
+                        showDeleteDialog = true
+                    }
+                )
+
+                if (showDeleteDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showDeleteDialog = false },
+                        title = { Text("Delete Account") },
+                        text = { Text("Are you sure you want to delete your account?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showDeleteDialog = false
+                                deleteAccount(this@ProfileActivity, FirebaseFirestore.getInstance(), userEmail)
+                            }) {
+                                Text("Yes")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showDeleteDialog = false }) {
+                                Text("No")
+                            }
+                        }
+                    )
+                }
             }
+        }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreenWithNavBar(
     userName: String,
     userEmail: String,
-    onSignOutClick: () -> Unit
+    userPhotoUrl: String,
+    onEditPreferenceClick: () -> Unit,
+    onSignOutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
 ) {
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Profile") }
-            )
-        },
         bottomBar = {
             NavBar(context = LocalContext.current)
         }
     ) { innerPadding ->
         Box(modifier = Modifier.padding(innerPadding)) {
             ProfileScreenContent(
-                userName,
-                userEmail,
-                onSignOutClick
+                userName = userName,
+                userEmail = userEmail,
+                userPhotoUrl = userPhotoUrl,
+                onEditPreferenceClick = onEditPreferenceClick,
+                onSignOutClick = onSignOutClick,
+                onDeleteAccountClick = onDeleteAccountClick
             )
         }
     }
@@ -87,94 +131,99 @@ fun ProfileScreenWithNavBar(
 fun ProfileScreenContent(
     userName: String,
     userEmail: String,
-    onSignOutClick: () -> Unit
+    userPhotoUrl: String,
+    onEditPreferenceClick: () -> Unit,
+    onSignOutClick: () -> Unit,
+    onDeleteAccountClick: () -> Unit
 ) {
-    val context = LocalContext.current
-    val firestore = FirebaseFirestore.getInstance()
-    var showDialog by remember { mutableStateOf(false) }
-    val photoUrl = GoogleSignIn.getLastSignedInAccount(context)?.photoUrl
-
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.Center,
+            .padding(horizontal = 24.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (photoUrl != null) {
-            AsyncImage(
-                model = photoUrl,
-                contentDescription = "User Photo",
-                modifier = Modifier
-                    .size(100.dp)
-                    .padding(bottom = 16.dp)
-            )
-        }
-        Text(text = "Hey, $userName!", fontSize = 20.sp, modifier = Modifier.padding(bottom = 8.dp))
-        Text(text = userEmail, fontSize = 16.sp, modifier = Modifier.padding(bottom = 16.dp))
-        Button(onClick = onSignOutClick) {
-            Text(text = "Sign Out")
-        }
+        AsyncImage(
+            model = userPhotoUrl,
+            contentDescription = "User Photo",
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(120.dp)
+                .clip(CircleShape)
+                .border(2.dp, Color.Black, CircleShape)
+        )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { showDialog = true }) {
-            Text(text = "Delete Account")
-        }
-    }
+        Text(userName, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Text(userEmail, fontSize = 16.sp, color = Color.Gray)
+        Spacer(modifier = Modifier.height(24.dp))
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { showDialog = false },
-            title = { Text("Delete Account") },
-            text = { Text("Are you sure you want to delete your account?") },
-            confirmButton = {
-                TextButton(onClick = {
-                    showDialog = false
-                    deleteAccount(context, firestore, userEmail)
-                }) {
-                    Text("Yes")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDialog = false }) {
-                    Text("No")
-                }
-            }
+        ProfileOptionCard(
+            icon = Icons.Default.Restaurant,
+            label = "Edit Food Preference",
+            iconTint = Color(0xFF7B1FA2),
+            onClick = onEditPreferenceClick
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ProfileOptionCard(
+            icon = Icons.Default.Logout,
+            label = "Logout",
+            iconTint = Color(0xFFD32F2F),
+            onClick = onSignOutClick
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+        ProfileOptionCard(
+            icon = Icons.Default.Delete,
+            label = "Delete Account",
+            iconTint = Color(0xFFE53935),
+            onClick = onDeleteAccountClick
         )
     }
 }
 
-fun deleteAccount(
-    context: Context,
-    firestore: FirebaseFirestore,
-    userEmail: String
-) {
-    // Sign out from Google
-    GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
-        .addOnCompleteListener {
-            // Delete user document
-            firestore.collection("user").whereEqualTo("email", userEmail).get()
-                .addOnSuccessListener { querySnapshot ->
-                    querySnapshot.documents.forEach { it.reference.delete() }
-                }
-
-            // Delete food items
-            firestore.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
-                .addOnSuccessListener { querySnapshot ->
-                    querySnapshot.documents.forEach { it.reference.delete() }
-                }
-
-            // Delete consumption history
-            firestore.collection("consumptionhistory").whereEqualTo("userEmail", userEmail).get()
-                .addOnSuccessListener { querySnapshot ->
-                    querySnapshot.documents.forEach { it.reference.delete() }
-                }
-
-            // Show success message and navigate to MainActivity
-            Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
-            val intent = Intent(context, MainActivity::class.java)
-            context.startActivity(intent)
-            (context as? ComponentActivity)?.finish()
+@Composable
+fun ProfileOptionCard(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, iconTint: Color, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        color = Color(0xFFFDFDFD),
+        tonalElevation = 2.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(icon, contentDescription = label, tint = iconTint)
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(label, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            }
+            Icon(Icons.Default.ArrowForwardIos, contentDescription = "Arrow", tint = Color.LightGray, modifier = Modifier.size(16.dp))
         }
+    }
+}
+
+fun deleteAccount(context: Context, firestore: FirebaseFirestore, userEmail: String) {
+    GoogleSignIn.getClient(context, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut().addOnCompleteListener {
+        firestore.collection("users").whereEqualTo("email", userEmail).get()
+            .addOnSuccessListener { querySnapshot ->
+                querySnapshot.documents.forEach { it.reference.delete() }
+            }
+        firestore.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
+            .addOnSuccessListener { querySnapshot ->
+                querySnapshot.documents.forEach { it.reference.delete() }
+            }
+        firestore.collection("consumptionhistory").whereEqualTo("userEmail", userEmail).get()
+            .addOnSuccessListener { querySnapshot ->
+                querySnapshot.documents.forEach { it.reference.delete() }
+            }
+        Toast.makeText(context, "Account deleted successfully", Toast.LENGTH_SHORT).show()
+        val intent = Intent(context, MainActivity::class.java)
+        context.startActivity(intent)
+        (context as? ComponentActivity)?.finish()
+    }
         .addOnFailureListener { e ->
             Toast.makeText(context, "Failed to delete account: ${e.message}", Toast.LENGTH_SHORT).show()
         }

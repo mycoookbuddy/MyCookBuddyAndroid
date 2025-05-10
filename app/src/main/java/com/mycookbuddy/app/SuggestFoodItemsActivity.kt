@@ -28,6 +28,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.draw.shadow
 
 class SuggestFoodItemsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -174,7 +178,33 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         db.collection("fooditem").document(id)
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
-                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
+                val meal = getMealTypeBasedOnTime().first()
+                val itemName = personalItems.find { it.first == id }?.second?.name ?: "your meal"
+                val message = "Hope you enjoyed $itemName in $meal!"
+                val spannable = android.text.SpannableString(message)
+
+                val itemStart = message.indexOf(itemName)
+                if (itemStart >= 0) {
+                    spannable.setSpan(
+                        android.text.style.StyleSpan(android.graphics.Typeface.ITALIC),
+                        itemStart,
+                        itemStart + itemName.length,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+
+                val mealStart = message.indexOf(meal)
+                if (mealStart >= 0) {
+                    spannable.setSpan(
+                        android.text.style.StyleSpan(android.graphics.Typeface.BOLD),
+                        mealStart,
+                        mealStart + meal.length,
+                        android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                    )
+                }
+
+                Toast.makeText(context, spannable, Toast.LENGTH_SHORT).show()
                 loadingState.remove(id)
                 fetch()
             }
@@ -235,9 +265,42 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             }
         },
         topBar = {
-            val message =
-                "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
+            val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
             CenterAlignedTopAppBar(title = { Text(message) })
+            val meal = getMealTypeBasedOnTime().first()
+            val greeting = getWelcomeMessageBasedOnTime()
+
+            TopAppBar(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        brush = Brush.horizontalGradient(
+                            listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))
+                        )
+                    ),
+                title = {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = "Hello, $userName!",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = "Good $greeting — Enjoy your $meal suggestions!",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                    containerColor = Color.Transparent,
+                    scrolledContainerColor = Color.Transparent
+                )
+            )
         },
         bottomBar = {
             NavBar(context = LocalContext.current)
@@ -246,10 +309,11 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         LazyColumn(
             contentPadding = padding,
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+//            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
             items(personalItems.filter { filterPersonal(it.second) }) { (id, item) ->
+                Spacer(modifier = Modifier.height(16.dp))
                 FoodItemCard(
                     item,
                     false,
@@ -296,37 +360,78 @@ fun GradientHeader(text: String) {
 }
 
 @Composable
-fun FoodItemCard(item: FoodItem, isGeneral: Boolean, onConfirm: () -> Unit, onAdd: () -> Unit, isLoading: Boolean) {
+fun FoodItemCard(
+    item: FoodItem,
+    isGeneral: Boolean,
+    onConfirm: () -> Unit,
+    onAdd: () -> Unit,
+    isLoading: Boolean
+) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        elevation = CardDefaults.cardElevation(6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+        Box(
+            modifier = Modifier
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE0F7FA), // light cyan
+                            Color.White
+                        )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
         ) {
-            Column(Modifier.weight(1f)) {
-                Text(item.name, style = MaterialTheme.typography.titleMedium)
-                if (item.lastConsumptionDate.isNotEmpty()) {
-                    Text("Consumed on: ${item.lastConsumptionDate}", fontSize = 12.sp, color = Color.Gray)
-                }
-                else if(!isGeneral)
-                    Text("Never consumed", fontSize = 12.sp, color = Color.Gray)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                } else {
-                    if (isGeneral) {
-                        IconButton(onClick = onAdd) {
-                            Icon(Icons.Default.AddCircle, contentDescription = "Add to Personal", tint = Color(0xFF26A69A))
-                        }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.name, style = MaterialTheme.typography.titleMedium)
+                    if (item.lastConsumptionDate.isNotEmpty()) {
+                        Text(
+                            "Consumed on: ${item.lastConsumptionDate}",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    } else if (!isGeneral) {
+                        Text(
+                            "Never consumed",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
                     }
-                    IconButton(onClick = onConfirm) {
-                        Icon(Icons.Default.Restaurant, contentDescription = "Ate", tint = Color(0xFFEF5350))
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        if (isGeneral) {
+                            IconButton(onClick = onAdd) {
+                                Icon(
+                                    Icons.Default.AddCircle,
+                                    contentDescription = "Add to Personal",
+                                    tint = Color(0xFF26A69A)
+                                )
+                            }
+                        }
+                        IconButton(onClick = onConfirm) {
+                            Icon(
+                                Icons.Default.Restaurant,
+                                contentDescription = "Ate",
+                                tint = Color(0xFFEF5350)
+                            )
+                        }
                     }
                 }
             }
