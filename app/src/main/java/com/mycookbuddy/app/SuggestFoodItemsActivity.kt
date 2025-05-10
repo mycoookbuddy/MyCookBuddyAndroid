@@ -31,7 +31,6 @@ import java.util.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.ui.draw.shadow
 
 class SuggestFoodItemsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,7 +98,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     var showSheet by remember { mutableStateOf(false) }
 
 ////    val foodTypes = listOf("Veg", "Non Veg", "Eggy", "Vegan")
-    val eatingTypes = listOf("Breakfast", "Lunch", "Snacks", "Dinner")
+    val eatingTypes = listOf("Breakfast", "Lunch", "Dinner")
  //   var selectedFoodTypes by remember { mutableStateOf(foodTypes.toSet()) }
     var selectedEatingTypes by remember { mutableStateOf(eatingTypes.toSet()) }
 //    var userCuisines by remember { mutableStateOf(setOf<String>()) }
@@ -116,7 +115,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         return when (currentHour) {
             in 5..11 -> setOf("Breakfast") // Morning
             in 12..16 -> setOf("Lunch")    // Afternoon
-            in 17..20 -> setOf("Snacks")   // Evening
             else -> setOf("Dinner")        // Night
         }
     }
@@ -126,7 +124,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         return when (currentHour) {
             in 5..11 -> ("Morning")
             in 12..16 -> ("Afternoon")
-            in 17..20 -> ("Evening")
             else -> ("Evening")
         }
     }
@@ -210,29 +207,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             }
     }
 
-    fun addGeneral(item: FoodItem) {
-        loadingState[item.name] = true
-        val newItem = item.copy(userEmail = userEmail, repeatAfter = 7)
-        db.collection("fooditem").add(newItem).addOnSuccessListener {
-            Toast.makeText(context, "Added to personal", Toast.LENGTH_SHORT).show()
-            personalNames = personalNames + item.name
-            generalItems = generalItems.filter { it.second.name != item.name }
-            loadingState.remove(item.name)
-            fetch()
-        }
-    }
-
-    fun consumeGeneral(item: FoodItem) {
-        loadingState[item.name] = true
-        val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        db.collection("fooditem").add(item.copy(userEmail = userEmail, lastConsumptionDate = today))
-            .addOnSuccessListener {
-                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
-                generalItems = generalItems.filter { it.second.name != item.name }
-                loadingState.remove(item.name)
-            }
-    }
-
     var isLoading by remember { mutableStateOf(true) }
     // Fetch data only once
     LaunchedEffect(Unit) {
@@ -268,6 +242,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
             CenterAlignedTopAppBar(title = { Text(message) })
             val meal = getMealTypeBasedOnTime().first()
+            selectedEatingTypes = getMealTypeBasedOnTime()
             val greeting = getWelcomeMessageBasedOnTime()
 
             TopAppBar(

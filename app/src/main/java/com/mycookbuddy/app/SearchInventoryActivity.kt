@@ -65,7 +65,7 @@ class SearchInventoryActivity : ComponentActivity() {
         var filteredItems by remember { mutableStateOf<List<CommonFoodItem>>(emptyList()) }
         var searchText by remember { mutableStateOf(TextFieldValue("")) }
         var cuisines by remember { mutableStateOf<List<String>>(emptyList()) }
-        var selectedMealTypes by remember { mutableStateOf(setOf("Breakfast", "Lunch", "Snacks", "Dinner")) }
+        var selectedMealTypes by remember { mutableStateOf(setOf("Breakfast", "Lunch", "Dinner")) }
         var selectedFoodTypes by remember { mutableStateOf(setOf("Veg", "Non Veg", "Eggy", "Vegan")) }
         var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
@@ -211,7 +211,7 @@ AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
         Column(Modifier.padding(16.dp)) {
             Text("Meal Types", style = MaterialTheme.typography.titleMedium)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("Breakfast", "Lunch", "Snacks", "Dinner").forEach { type ->
+                listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
                     FilterChip(
                         selected = selectedMealTypes.contains(type),
                         onClick = {
