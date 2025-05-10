@@ -46,6 +46,14 @@ class SuggestFoodItemsActivity : ComponentActivity() {
     }
 }
 
+fun filterCommonItemsNotInFoodItems(
+    commonItems: List<Pair<String, CommonFoodItem>>,
+    foodItems: List<Pair<String, FoodItem>>
+): List<Pair<String, CommonFoodItem>> {
+    val foodItemNames = foodItems.map { it.second.name }.toSet()
+    return commonItems.filter { it.second.name !in foodItemNames }
+}
+
 fun filterEligiblePersonalFoodItemsForSuggestion(
     personalItems: List<Pair<String, FoodItem>>,
     onResult: (List<Pair<String, FoodItem>>) -> Unit
@@ -74,6 +82,7 @@ fun filterEligiblePersonalFoodItemsForSuggestion(
    onResult(items)
 }
 
+
 fun fetchPersonalFoodItems(
     db: FirebaseFirestore,
     userEmail: String,
@@ -86,6 +95,24 @@ fun fetchPersonalFoodItems(
                 if (item != null) doc.id to item else null
             }
             onResult(personalItems)
+        }
+}
+fun fetchCommonFoodItems(
+    db: FirebaseFirestore,
+    userFoodTypes: List<String>,
+    userCuisines: List<String>,
+    onResult: (List<Pair<String, CommonFoodItem>>) -> Unit
+) {
+    db.collection("commonfooditem").get()
+        .addOnSuccessListener { result ->
+            val items = result.documents.mapNotNull { doc ->
+                val item = doc.toObject(CommonFoodItem::class.java)
+                if (item != null &&
+                    item.type in userFoodTypes &&
+                    item.cuisines.any { it in userCuisines }
+                ) doc.id to item else null
+            }
+            onResult(items)
         }
 }
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -104,11 +131,14 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 //    var userCuisines by remember { mutableStateOf(setOf<String>()) }
  //   var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
-    var personalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
-    var generalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
-    var personalNames by remember { mutableStateOf(setOf<String>()) }
+    var filteredPersonalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
+    var allPersonalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
+
 
     val loadingState = remember { mutableStateMapOf<String, Boolean>() }
+    var commonItems by remember { mutableStateOf(listOf<Pair<String, CommonFoodItem>>()) }
+    var userFoodTypes by remember { mutableStateOf(listOf<String>()) }
+    var userCuisines by remember { mutableStateOf(listOf<String>()) }
 
     fun getMealTypeBasedOnTime(): Set<String> {
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
@@ -128,12 +158,22 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         }
     }
 
-//    fun filterGeneral(item: FoodItem): Boolean =
-//        (selectedFoodTypes.isNotEmpty() && selectedFoodTypes.contains(item.type)) &&
-//                (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes }) &&
-//                (selectedCuisines.isNotEmpty() && item.cuisines.any { it in selectedCuisines })
+    fun fetchUserPreferences(
+        onResult: () -> Unit
+    ) {
+        db.collection("users").document(userEmail).get()
+            .addOnSuccessListener { document ->
+                userFoodTypes = document.get("foodTypes") as? List<String> ?: emptyList()
+                userCuisines = document.get("cuisines") as? List<String> ?: emptyList()
+                onResult();
+            }
 
-    fun filterPersonal(item: FoodItem): Boolean =
+    }
+
+    fun applyMealFilterForPersonalFoodItem(item: FoodItem): Boolean =
+        (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes })
+
+    fun applyMealFilterForCommonFoodItem(item: CommonFoodItem): Boolean =
         (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes })
 
     fun fetch() {
@@ -162,14 +202,33 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         }.time
                         if (item != null && next < today) doc.id to item else null
                     }
-                    personalItems = items
-                    personalNames = items.map { it.second.name }.toSet()
+                    filteredPersonalItems = items
+
 
                 }
 
     }
+    fun confirmCommonFoodItemConsumption(
+        commonFoodItem: CommonFoodItem
+    ) {
+        val foodItem = FoodItem(
+            name = commonFoodItem.name,
+            type = commonFoodItem.type,
+            eatingTypes = commonFoodItem.eatingTypes,
+            lastConsumptionDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
+            userEmail = userEmail
+        )
 
-    fun confirmItem(id: String) {
+        db.collection("fooditem")
+            .add(foodItem)
+            .addOnSuccessListener {
+                Toast.makeText(context, "Food item added successfully!", Toast.LENGTH_SHORT).show()
+            }
+            .addOnFailureListener { e ->
+                Toast.makeText(context, "Failed to add food item: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+    fun confirmPersonalFoodItemConsumption(id: String) {
         loadingState[id] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         db.collection("fooditem").document(id)
@@ -177,7 +236,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             .addOnSuccessListener {
 //                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
                 val meal = getMealTypeBasedOnTime().first()
-                val itemName = personalItems.find { it.first == id }?.second?.name ?: "your meal"
+                val itemName = filteredPersonalItems.find { it.first == id }?.second?.name ?: "your meal"
                 val message = "Hope you enjoyed $itemName in $meal!"
                 val spannable = android.text.SpannableString(message)
 
@@ -211,13 +270,23 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     // Fetch data only once
     LaunchedEffect(Unit) {
         isLoading = true
-        fetchPersonalFoodItems(db, userEmail) { personal ->
-            filterEligiblePersonalFoodItemsForSuggestion(
-                personal)  { personalFiltered ->
-                personalItems = personalFiltered
-                isLoading = false
+        fetchUserPreferences {
+            fetchPersonalFoodItems(db, userEmail) { personal ->
+                allPersonalItems = personal
+                filterEligiblePersonalFoodItemsForSuggestion(
+                    personal)  { personalFiltered ->
+                    filteredPersonalItems = personalFiltered
+                    fetchCommonFoodItems(db, userFoodTypes, userCuisines) { common ->
+                        commonItems = filterCommonItemsNotInFoodItems(common, allPersonalItems)
+                        isLoading = false
+                    }
+
+                }
             }
+
         }
+
+
     }
 
     if (isLoading) {
@@ -286,15 +355,30 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
 //            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-
-            items(personalItems.filter { filterPersonal(it.second) }) { (id, item) ->
+            // Personal Items Section
+            item {
+                GradientHeader("Your Food Items")
+            }
+            items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
                 Spacer(modifier = Modifier.height(16.dp))
                 FoodItemCard(
                     item,
                     false,
-                    onConfirm = { confirmItem(id) },
+                    onConfirm = { confirmPersonalFoodItemConsumption(id) },
                     onAdd = {},
                     isLoading = loadingState[item.name] == true
+                )
+            }
+            // Common Items Section
+            item {
+                GradientHeader("Common Food Items")
+            }
+            items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
+                Spacer(modifier = Modifier.height(16.dp))
+                CommonFoodItemCard(
+                    item = item,
+                    onConfirm = { confirmCommonFoodItemConsumption(item) },
+                    isLoading = false
                 )
             }
 
@@ -400,6 +484,63 @@ fun FoodItemCard(
                                 )
                             }
                         }
+                        IconButton(onClick = onConfirm) {
+                            Icon(
+                                Icons.Default.Restaurant,
+                                contentDescription = "Ate",
+                                tint = Color(0xFFEF5350)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun CommonFoodItemCard(
+    item: CommonFoodItem,
+    onConfirm: () -> Unit,
+    isLoading: Boolean
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(6.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Box(
+            modifier = Modifier
+                .background(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            Color(0xFFE0F7FA), // light cyan
+                            Color.White
+                        )
+                    ),
+                    shape = RoundedCornerShape(12.dp)
+                )
+                .padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(item.name, style = MaterialTheme.typography.titleMedium)
+
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+
                         IconButton(onClick = onConfirm) {
                             Icon(
                                 Icons.Default.Restaurant,

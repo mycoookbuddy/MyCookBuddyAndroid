@@ -9,6 +9,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -100,30 +101,27 @@ fun LoadingIndicator(message: String) {
 
                 firestore.collection("users").document(userEmail).get()
                     .addOnSuccessListener { document ->
-                        if (document.exists()) {
-                            val privacyPolicyAccepted = document.getBoolean("privacyPolicy") ?: false
-                            if (!privacyPolicyAccepted) {
+                        if (!document.exists()) {
                                 setContent {
-                                    var showDialog by remember { mutableStateOf(false) }
-
                                     PrivacyPolicyScreen(
-                                        context = this,
-                                        onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
-                                        onReject = { showDialog = true }
+                                        onNext = {
+                                            // Handle the "Next" button click
+                                            saveUserToFirestore(account)
+                                            navigateToNextScreen(account)
+                                        },
+                                        onViewPrivacyPolicy = {
+                                            // Handle the "View Privacy Policy" link click
+                                            val htmlContent = loadHtmlFromAssets(context = this, fileName = "privacy_policy.html")
+                                            setContent {
+                                                HtmlWebView(htmlContent = htmlContent)
+                                            }
+                                        }
                                     )
 
-                                    if (showDialog) {
-                                        RejectConfirmationDialog(
-                                            onConfirm = { logOutUser() },
-                                            onDismiss = { showDialog = false }
-                                        )
-                                    }
                                 }
-                            } else {
-                                navigateToNextScreen(account)
-                            }
+
                         } else {
-                            saveUserToFirestore(account)
+                            navigateToNextScreen(account)
                         }
                     }
                     .addOnFailureListener { e ->
@@ -139,60 +137,41 @@ fun LoadingIndicator(message: String) {
 
     @Composable
     fun PrivacyPolicyScreen(
-        context: Context,
-        onAccept: () -> Unit,
-        onReject: () -> Unit
+        onNext: () -> Unit,
+        onViewPrivacyPolicy: () -> Unit
     ) {
-        var showDialog by remember { mutableStateOf(false) }
-        val htmlContent = loadHtmlFromAssets(context, "privacy_policy.html")
-
-        if (showDialog) {
-            AlertDialog(
-                onDismissRequest = { showDialog = false },
-                title = { Text("Confirmation") },
-                text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
-                confirmButton = {
-                    Button(onClick = {
-                        showDialog = false
-                        onReject()
-                    }) {
-                        Text("Reject")
-                    }
-                },
-                dismissButton = {
-                    Button(onClick = { showDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
-        }
+        var isChecked by remember { mutableStateOf(false) }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            Box(
-                modifier = Modifier
-                    .weight(1f) // Allocate remaining space to the WebView
-                    .fillMaxWidth()
-            ) {
-                HtmlWebView(htmlContent = htmlContent)
+            Column {
+                Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = isChecked,
+                        onCheckedChange = { isChecked = it }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("I accept the privacy policy", style = MaterialTheme.typography.bodyMedium)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "View Privacy Policy",
+                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.clickable { onViewPrivacyPolicy() }
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
+            Button(
+                onClick = onNext,
+                enabled = isChecked,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Button(onClick = onAccept) {
-                    Text("Accept")
-                }
-                Button(onClick = { showDialog = true }) {
-                    Text("Reject")
-                }
+                Text("Next")
             }
         }
     }
@@ -278,7 +257,7 @@ fun LoadingIndicator(message: String) {
         val user = mutableMapOf<String, Any>(
             "name" to (userName ?: "User"),
             "email" to userEmail,
-            "privacyPolicy" to false,
+            "privacyPolicy" to true,
             "notifications" to defaultNotifications
         )
 
@@ -286,22 +265,6 @@ fun LoadingIndicator(message: String) {
             .set(user)
             .addOnSuccessListener {
                 Log.d("Firestore", "User data successfully saved!")
-                setContent {
-                    var showDialog by remember { mutableStateOf(false) }
-
-                    PrivacyPolicyScreen(
-                        context = this,
-                        onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
-                        onReject = { showDialog = true }
-                    )
-
-                    if (showDialog) {
-                        RejectConfirmationDialog(
-                            onConfirm = { logOutUser() },
-                            onDismiss = { showDialog = false }
-                        )
-                    }
-                }
             }
             .addOnFailureListener { e ->
                 Log.e("Firestore", "Error saving user data", e)
