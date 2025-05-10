@@ -115,7 +115,6 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
     val mealTypeColors = mapOf(
         "Breakfast" to Color(0xFFFFF59D),
         "Lunch" to Color(0xFF90CAF9),
-        "Snacks" to Color(0xFFFFCC80),
         "Dinner" to Color(0xFFCE93D8)
     )
 
@@ -211,7 +210,7 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
 
                 Text("Meal Preferences", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf("Breakfast", "Lunch", "Snacks", "Dinner").forEach { type ->
+                    listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
                         ElevatedFilterChip(
                             selected = selectedEatingTypes.contains(type),
                             onClick = {

@@ -221,7 +221,7 @@ fun FoodItemDetailScreen(
 
                 Text("Meal Preferences", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf("Breakfast", "Lunch", "Snacks", "Dinner").forEach { type ->
+                    listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
                         ElevatedFilterChip(
                             selected = eatingType.contains(type),
                             onClick = {

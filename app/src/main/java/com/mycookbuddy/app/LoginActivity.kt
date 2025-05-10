@@ -1,8 +1,11 @@
 package com.mycookbuddy.app
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
@@ -19,6 +23,8 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.tasks.Task
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
+import java.io.BufferedReader
+import java.io.InputStreamReader
 
 class LoginActivity : ComponentActivity() {
 
@@ -101,7 +107,7 @@ fun LoadingIndicator(message: String) {
                                     var showDialog by remember { mutableStateOf(false) }
 
                                     PrivacyPolicyScreen(
-                                        userEmail = userEmail,
+                                        context = this,
                                         onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
                                         onReject = { showDialog = true }
                                     )
@@ -131,55 +137,81 @@ fun LoadingIndicator(message: String) {
         }
     }
 
-  @Composable
-  fun PrivacyPolicyScreen(
-      userEmail: String,
-      onAccept: () -> Unit,
-      onReject: () -> Unit
-  ) {
-      var showDialog by remember { mutableStateOf(false) }
+    @Composable
+    fun PrivacyPolicyScreen(
+        context: Context,
+        onAccept: () -> Unit,
+        onReject: () -> Unit
+    ) {
+        var showDialog by remember { mutableStateOf(false) }
+        val htmlContent = loadHtmlFromAssets(context, "privacy_policy.html")
 
-      if (showDialog) {
-          AlertDialog(
-              onDismissRequest = { showDialog = false },
-              title = { Text("Confirmation") },
-              text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
-              confirmButton = {
-                  Button(onClick = {
-                      showDialog = false
-                      onReject()
-                  }) {
-                      Text("Reject")
-                  }
-              },
-              dismissButton = {
-                  Button(onClick = { showDialog = false }) {
-                      Text("Cancel")
-                  }
-              }
-          )
-      }
+        if (showDialog) {
+            AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text("Confirmation") },
+                text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
+                confirmButton = {
+                    Button(onClick = {
+                        showDialog = false
+                        onReject()
+                    }) {
+                        Text("Reject")
+                    }
+                },
+                dismissButton = {
+                    Button(onClick = { showDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
 
-      Column(
-          modifier = Modifier.fillMaxSize().padding(16.dp),
-          horizontalAlignment = Alignment.CenterHorizontally,
-          verticalArrangement = Arrangement.Center
-      ) {
-          Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
-          Spacer(modifier = Modifier.height(16.dp))
-          Text("Privacy policy content goes here...")
-          Spacer(modifier = Modifier.height(16.dp))
-          Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-              Button(onClick = onAccept) {
-                  Text("Accept")
-              }
-              Button(onClick = { showDialog = true }) {
-                  Text("Reject")
-              }
-          }
-      }
-  }
-
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
+            Spacer(modifier = Modifier.height(16.dp))
+            Box(
+                modifier = Modifier
+                    .weight(1f) // Allocate remaining space to the WebView
+                    .fillMaxWidth()
+            ) {
+                HtmlWebView(htmlContent = htmlContent)
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(onClick = onAccept) {
+                    Text("Accept")
+                }
+                Button(onClick = { showDialog = true }) {
+                    Text("Reject")
+                }
+            }
+        }
+    }
+    @Composable
+    fun HtmlWebView(htmlContent: String) {
+        AndroidView(factory = { context ->
+            WebView(context).apply {
+                webViewClient = WebViewClient()
+                loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
+            }
+        })
+    }
+    fun loadHtmlFromAssets(context: Context, fileName: String): String {
+        return context.assets.open(fileName).use { inputStream ->
+            BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                reader.readText()
+            }
+        }
+    }
     @Composable
     fun RejectConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
         AlertDialog(
@@ -239,7 +271,7 @@ fun LoadingIndicator(message: String) {
                     var showDialog by remember { mutableStateOf(false) }
 
                     PrivacyPolicyScreen(
-                        userEmail = userEmail,
+                        context = this,
                         onAccept = { updatePrivacyPolicyFlag(userEmail, account) },
                         onReject = { showDialog = true }
                     )
