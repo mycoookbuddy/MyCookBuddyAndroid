@@ -1,6 +1,6 @@
 package com.mycookbuddy.app
 
-data class PersonalFoodItem(
+data class FoodItem(
     val name: String = "",
     val userEmail: String = "",
     val type: String = "",

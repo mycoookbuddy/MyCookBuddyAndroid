@@ -71,7 +71,7 @@ class SettingsActivity : ComponentActivity() {
                     .get()
                     .addOnSuccessListener { result ->
                         val foodItems = result.documents.mapNotNull { doc ->
-                            doc.toObject(PersonalFoodItem::class.java)?.copy(userEmail = userEmail)
+                            doc.toObject(FoodItem::class.java)?.copy(userEmail = userEmail)
                         }
 
                         // Step 3: Check for duplicates in /fooditem collection
