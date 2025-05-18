@@ -1,6 +1,5 @@
 package com.mycookbuddy.app
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -8,8 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -20,24 +17,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
-import com.mycookbuddy.app.R
-import kotlinx.coroutines.delay
 
-class SettingsActivity : ComponentActivity() {
+class OnboardingActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,13 +41,8 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 SettingsScreen(
-                    onSave = { selectedCuisines, selectedFoodTypes ->
+                    onNext = { selectedCuisines, selectedFoodTypes ->
                         userEmail?.let { savePreferences(it, selectedCuisines, selectedFoodTypes) }
-                    },
-                    onSkip = {
-                        val intent = Intent(this, SuggestFoodItemsActivity::class.java)
-                        startActivity(intent)
-                        finish()
                     }
                 )
             }
@@ -81,8 +69,7 @@ class SettingsActivity : ComponentActivity() {
                     "Preferences saved successfully",
                     Toast.LENGTH_SHORT
                 ).show()
-                val intent = Intent(this, SuggestFoodItemsActivity::class.java)
-                startActivity(intent)
+                setResult(RESULT_OK) // Notify MainActivity that saving is done
                 finish()
             }
             .addOnFailureListener { e ->
@@ -147,8 +134,7 @@ class SettingsActivity : ComponentActivity() {
 
     @Composable
     fun SettingsScreen(
-        onSave: (List<String>, List<String>) -> Unit,
-        onSkip : () -> Unit
+        onNext: (List<String>, List<String>) -> Unit,
     ) {
         val firestore = FirebaseFirestore.getInstance()
         var cuisines by remember { mutableStateOf<List<String>>(emptyList()) }
@@ -235,14 +221,14 @@ class SettingsActivity : ComponentActivity() {
             ) {
                 Button(
                     onClick = {
-                        onSave(selectedCuisines.toList(), selectedFoodTypes.toList())
+                        onNext(selectedCuisines.toList(), selectedFoodTypes.toList())
                     },
                     shape = RoundedCornerShape(20.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ACC1))
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = "Save", tint = Color.White)
+                    Icon(Icons.Default.Check, contentDescription = "Next", tint = Color.White)
                     Spacer(Modifier.width(8.dp))
-                    Text("Save", color = Color.White)
+                    Text("Next", color = Color.White)
                 }
 
             }

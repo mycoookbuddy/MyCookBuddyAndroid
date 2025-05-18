@@ -11,10 +11,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -26,6 +29,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Source
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 
 class LoginActivity : ComponentActivity() {
 
@@ -97,37 +103,8 @@ fun LoadingIndicator(message: String) {
             val account = completedTask.getResult(Exception::class.java)
             Log.d("GoogleSignIn", "Signed in as: ${account?.displayName}")
             if (account != null) {
-                val userEmail = account.email ?: return
-
-                firestore.collection("users").document(userEmail).get()
-                    .addOnSuccessListener { document ->
-                        if (!document.exists()) {
-                                setContent {
-                                    PrivacyPolicyScreen(
-                                        onNext = {
-                                            // Handle the "Next" button click
-                                            saveUserToFirestore(account)
-                                            navigateToNextScreen(account)
-                                        },
-                                        onViewPrivacyPolicy = {
-                                            // Handle the "View Privacy Policy" link click
-                                            val htmlContent = loadHtmlFromAssets(context = this, fileName = "privacy_policy.html")
-                                            setContent {
-                                                HtmlWebView(htmlContent = htmlContent)
-                                            }
-                                        }
-                                    )
-
-                                }
-
-                        } else {
-                            navigateToNextScreen(account)
-                        }
-                    }
-                    .addOnFailureListener { e ->
-                        Log.e("Firestore", "Error checking user data", e)
-                        Toast.makeText(this, "Error checking user data", Toast.LENGTH_SHORT).show()
-                    }
+                setResult(RESULT_OK) // Notify MainActivity that saving is done
+                finish() // Close PrivacyPolicyActivity
             }
         } catch (e: Exception) {
             Log.e("GoogleSignIn", "Sign-in failed", e)
@@ -135,169 +112,15 @@ fun LoadingIndicator(message: String) {
         }
     }
 
-    @Composable
-    fun PrivacyPolicyScreen(
-        onNext: () -> Unit,
-        onViewPrivacyPolicy: () -> Unit
-    ) {
-        var isChecked by remember { mutableStateOf(false) }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = isChecked,
-                        onCheckedChange = { isChecked = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("I accept the privacy policy", style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "View Privacy Policy",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.clickable { onViewPrivacyPolicy() }
-                )
-            }
-            Button(
-                onClick = onNext,
-                enabled = isChecked,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Next")
-            }
-        }
-    }
-    @Composable
-    fun HtmlWebView(htmlContent: String) {
-        AndroidView(factory = { context ->
-            WebView(context).apply {
-                webViewClient = WebViewClient()
-                loadDataWithBaseURL(null, htmlContent, "text/html", "UTF-8", null)
-            }
-        })
-    }
-    fun loadHtmlFromAssets(context: Context, fileName: String): String {
-        return context.assets.open(fileName).use { inputStream ->
-            BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                reader.readText()
-            }
-        }
-    }
-    @Composable
-    fun RejectConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("Confirmation") },
-            text = { Text("You will be logged out and presented with the Sign-in screen. Do you want to proceed?") },
-            confirmButton = {
-                Button(onClick = onConfirm) {
-                    Text("Reject")
-                }
-            },
-            dismissButton = {
-                Button(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
 
-    private fun updatePrivacyPolicyFlag(userEmail: String, account: GoogleSignInAccount) {
-        firestore.collection("users").document(userEmail)
-            .update("privacyPolicy", true)
-            .addOnSuccessListener {
-                Toast.makeText(this, "Privacy Policy Accepted", Toast.LENGTH_SHORT).show()
-                navigateToNextScreen(account)
-            }
-            .addOnFailureListener { e ->
-                Log.e("Firestore", "Error updating privacy policy", e)
-                Toast.makeText(this, "Error updating privacy policy", Toast.LENGTH_SHORT).show()
-            }
-    }
 
-    private fun logOutUser() {
-        GoogleSignIn.getClient(this, GoogleSignInOptions.DEFAULT_SIGN_IN).signOut()
-            .addOnCompleteListener {
-                Toast.makeText(this, "You have been logged out", Toast.LENGTH_SHORT).show()
-                startActivity(Intent(this, LoginActivity::class.java))
-                finish()
-            }
-    }
 
-    private fun saveUserToFirestore(account: GoogleSignInAccount) {
-        val userName = account.displayName
-        val userEmail = account.email ?: return
-        // Define the default notifications
 
-        val defaultNotifications = listOf(
-            mapOf(
-                "mealType" to "Breakfast",
-                "status" to true,
-                "timestamp" to "7:30 AM"
-            ),
-            mapOf(
-                "mealType" to "Lunch",
-                "status" to true,
-                "timestamp" to "01:30 PM"
-            ),
-            mapOf(
-                "mealType" to "Dinner",
-                "status" to true,
-                "timestamp" to "7:30 PM"
-            )
-        )
-        val user = mutableMapOf<String, Any>(
-            "name" to (userName ?: "User"),
-            "email" to userEmail,
-            "privacyPolicy" to true,
-            "notifications" to defaultNotifications
-        )
 
-        firestore.collection("users").document(userEmail)
-            .set(user)
-            .addOnSuccessListener {
-                Log.d("Firestore", "User data successfully saved!")
-            }
-            .addOnFailureListener { e ->
-                Log.e("Firestore", "Error saving user data", e)
-                Toast.makeText(this, "Login failed!", Toast.LENGTH_SHORT).show()
-            }
-    }
 
-    private fun navigateToNextScreen(account: GoogleSignInAccount) {
-        val userEmail = account.email ?: return
-        firestore.collection("users").document(userEmail)
-            .get(Source.SERVER)
-            .addOnSuccessListener { document ->
-                val preferences = document.getString("preferences") ?: "NOT_SET"
-                if (preferences == "NOT_SET") {
-                    startActivity(Intent(this, SettingsActivity::class.java))
-                } else {
-                    navigateToSuggestedItems(account)
-                }
-                finish()
-            }
-            .addOnFailureListener { e ->
-                Log.e("Firestore", "Error fetching user preferences", e)
-                Toast.makeText(this, "Error fetching user data", Toast.LENGTH_SHORT).show()
-            }
-    }
 
-    private fun navigateToSuggestedItems(account: GoogleSignInAccount) {
-        val intent = Intent(this, SuggestFoodItemsActivity::class.java).apply {
-            putExtra("USER_EMAIL", account.email)
-        }
-        startActivity(intent)
-        finish()
-    }
+
 
     companion object {
         private const val RC_SIGN_IN = 100

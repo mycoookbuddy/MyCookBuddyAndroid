@@ -164,13 +164,13 @@ fun ProfileScreenContent(
         Text(userEmail, fontSize = 16.sp, color = Color.Gray)
         Spacer(modifier = Modifier.height(24.dp))
 
-//        ProfileOptionCard(
-//            icon = Icons.Default.Restaurant,
-//            label = "Edit Food Preference",
-//            iconTint = Color(0xFF7B1FA2),
-//            onClick = onEditPreferenceClick
-//        )
-//        Spacer(modifier = Modifier.height(12.dp))
+        ProfileOptionCard(
+            icon = Icons.Default.Restaurant,
+            label = "Edit Food Preference",
+            iconTint = Color(0xFF7B1FA2),
+            onClick = onEditPreferenceClick
+        )
+        Spacer(modifier = Modifier.height(12.dp))
         ProfileOptionCard(
             icon = Icons.Default.Notifications,
             label = "Edit Notifications",

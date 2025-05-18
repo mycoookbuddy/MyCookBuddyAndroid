@@ -108,8 +108,9 @@ fun fetchCommonFoodItems(
             val items = result.documents.mapNotNull { doc ->
                 val item = doc.toObject(CommonFoodItem::class.java)
                 if (item != null &&
-                    item.type in userFoodTypes &&
-                    item.cuisines.any { it in userCuisines }
+                    (userFoodTypes.isEmpty() || item.type in userFoodTypes)
+                    &&
+                    (userCuisines.isEmpty() || item.cuisines.any { it in userCuisines })
                 ) doc.id to item else null
             }
             onResult(items)
@@ -127,7 +128,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 ////    val foodTypes = listOf("Veg", "Non Veg", "Eggy", "Vegan")
     val eatingTypes = listOf("Breakfast", "Lunch", "Dinner")
  //   var selectedFoodTypes by remember { mutableStateOf(foodTypes.toSet()) }
-    var selectedEatingTypes by remember { mutableStateOf(eatingTypes.toSet()) }
+    //var selectedEatingTypes by remember { mutableStateOf(eatingTypes.toSet()) }
+    var selectedEatingTypes by remember { mutableStateOf(setOf<String>()) }
 //    var userCuisines by remember { mutableStateOf(setOf<String>()) }
  //   var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
@@ -181,31 +183,31 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         )
 
-            db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
-                .addOnSuccessListener { result ->
-                    val items = result.documents.mapNotNull { doc ->
-                        val item = doc.toObject(FoodItem::class.java)
-                            ?.copy(name = doc.getString("name") ?: "")
-                        val last = doc.getString("lastConsumptionDate")?.let {
-                            if (it.isNotEmpty()) {
-                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
-                            } else {
-                                SimpleDateFormat(
-                                    "dd/MM/yyyy",
-                                    Locale.getDefault()
-                                ).parse("01/01/1970")
-                            }
+        db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
+            .addOnSuccessListener { result ->
+                val items = result.documents.mapNotNull { doc ->
+                    val item = doc.toObject(FoodItem::class.java)
+                        ?.copy(name = doc.getString("name") ?: "")
+                    val last = doc.getString("lastConsumptionDate")?.let {
+                        if (it.isNotEmpty()) {
+                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
+                        } else {
+                            SimpleDateFormat(
+                                "dd/MM/yyyy",
+                                Locale.getDefault()
+                            ).parse("01/01/1970")
                         }
-                        val next = Calendar.getInstance().apply {
-                            time = last ?: Date(0)
-                            add(Calendar.DAY_OF_YEAR, item?.repeatAfter ?: 0)
-                        }.time
-                        if (item != null && next < today) doc.id to item else null
                     }
-                    filteredPersonalItems = items
-
-
+                    val next = Calendar.getInstance().apply {
+                        time = last ?: Date(0)
+                        add(Calendar.DAY_OF_YEAR, item?.repeatAfter ?: 0)
+                    }.time
+                    if (item != null && next < today) doc.id to item else null
                 }
+                filteredPersonalItems = items
+
+
+            }
 
     }
     fun confirmCommonFoodItemConsumption(
@@ -311,7 +313,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
             CenterAlignedTopAppBar(title = { Text(message) })
             val meal = getMealTypeBasedOnTime().first()
-            selectedEatingTypes = getMealTypeBasedOnTime()
+            if(selectedEatingTypes.isEmpty())
+                selectedEatingTypes = getMealTypeBasedOnTime()
             val greeting = getWelcomeMessageBasedOnTime()
 
             TopAppBar(

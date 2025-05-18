@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun NavBar(context: Context) {
     val navItems = listOf(
-        "Home" to MainActivity::class.java,
+        "Home" to SuggestFoodItemsActivity::class.java,
         "Search" to SearchInventoryActivity::class.java,
         "Manage" to FoodItemListActivity::class.java,
         "Profile" to ProfileActivity::class.java,
