@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -44,10 +45,14 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material.icons.filled.FilterAlt
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.Tune
+
 
 class SuggestFoodItemsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -280,18 +285,34 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         )
                     }
                 },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                actions = {
+                    IconButton(onClick = { showSheet = true }) {
+                        BadgedBox(
+                            badge = {
+                                if (selectedEatingTypes.isNotEmpty()) {
+                                    Badge {
+                                        Text("${selectedEatingTypes.size}")
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Tune,
+                                contentDescription = "Filter",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                },
+
+                        colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = Color.Transparent,
                     scrolledContainerColor = Color.Transparent
                 )
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showSheet = true }) {
-                Icon(Icons.Default.FilterList, contentDescription = "Filter")
-            }
-        },
-        bottomBar = {
+
+                bottomBar = {
             NavBar(context = context)
         }
     ) { paddingValues ->
