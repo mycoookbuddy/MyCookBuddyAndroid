@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import java.text.SimpleDateFormat
@@ -46,6 +47,8 @@ class SuggestFoodItemsActivity : ComponentActivity() {
     }
 }
 
+// --- FILTER FUNCTIONS ---
+
 fun filterCommonItemsNotInFoodItems(
     commonItems: List<Pair<String, CommonFoodItem>>,
     foodItems: List<Pair<String, FoodItem>>
@@ -62,15 +65,11 @@ fun filterEligiblePersonalFoodItemsForSuggestion(
         SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
     )
     val items = personalItems.mapNotNull { personalFoodItem ->
-
         val last = personalFoodItem.second.lastConsumptionDate.let {
             if (it.isNotEmpty()) {
                 SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
             } else {
-                SimpleDateFormat(
-                    "dd/MM/yyyy",
-                    Locale.getDefault()
-                ).parse("01/01/1970")
+                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse("01/01/1970")
             }
         }
         val next = Calendar.getInstance().apply {
@@ -79,9 +78,8 @@ fun filterEligiblePersonalFoodItemsForSuggestion(
         }.time
         if (next < today) personalFoodItem else null
     }
-   onResult(items)
+    onResult(items)
 }
-
 
 fun fetchPersonalFoodItems(
     db: FirebaseFirestore,
@@ -97,25 +95,39 @@ fun fetchPersonalFoodItems(
             onResult(personalItems)
         }
 }
+
+// --- PAGINATED COMMON FOOD FETCH ---
+
 fun fetchCommonFoodItems(
     db: FirebaseFirestore,
     userFoodTypes: List<String>,
     userCuisines: List<String>,
-    onResult: (List<Pair<String, CommonFoodItem>>) -> Unit
+    lastVisibleDoc: DocumentSnapshot?,
+    pageSize: Long = 50,
+    onResult: (List<Pair<String, CommonFoodItem>>, DocumentSnapshot?) -> Unit
 ) {
-    db.collection("commonfooditem").get()
-        .addOnSuccessListener { result ->
-            val items = result.documents.mapNotNull { doc ->
-                val item = doc.toObject(CommonFoodItem::class.java)
-                if (item != null &&
-                    (userFoodTypes.isEmpty() || item.type in userFoodTypes)
-                    &&
-                    (userCuisines.isEmpty() || item.cuisines.any { it in userCuisines })
-                ) doc.id to item else null
-            }
-            onResult(items)
+    val collection = db.collection("commonfooditem")
+    var query = when {
+        userFoodTypes.isEmpty() && userCuisines.isEmpty() -> collection
+        userFoodTypes.isEmpty() -> collection.whereArrayContainsAny("cuisines", userCuisines.take(10))
+        userCuisines.isEmpty() -> collection.whereIn("type", userFoodTypes.take(10))
+        else -> collection
+            .whereIn("type", userFoodTypes.take(10))
+            .whereArrayContainsAny("cuisines", userCuisines.take(10))
+    }
+    query = query.limit(pageSize)
+    if (lastVisibleDoc != null) {
+        query = query.startAfter(lastVisibleDoc)
+    }
+    query.get().addOnSuccessListener { result ->
+        val items = result.documents.mapNotNull { doc ->
+            doc.toObject(CommonFoodItem::class.java)?.let { doc.id to it }
         }
+        val newLastVisible = result.documents.lastOrNull()
+        onResult(items, newLastVisible)
+    }
 }
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
@@ -125,29 +137,29 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     val sheetState = rememberModalBottomSheetState()
     var showSheet by remember { mutableStateOf(false) }
 
-////    val foodTypes = listOf("Veg", "Non Veg", "Eggy", "Vegan")
     val eatingTypes = listOf("Breakfast", "Lunch", "Dinner")
- //   var selectedFoodTypes by remember { mutableStateOf(foodTypes.toSet()) }
-    //var selectedEatingTypes by remember { mutableStateOf(eatingTypes.toSet()) }
     var selectedEatingTypes by remember { mutableStateOf(setOf<String>()) }
-//    var userCuisines by remember { mutableStateOf(setOf<String>()) }
- //   var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
 
     var filteredPersonalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
     var allPersonalItems by remember { mutableStateOf(listOf<Pair<String, FoodItem>>()) }
-
 
     val loadingState = remember { mutableStateMapOf<String, Boolean>() }
     var commonItems by remember { mutableStateOf(listOf<Pair<String, CommonFoodItem>>()) }
     var userFoodTypes by remember { mutableStateOf(listOf<String>()) }
     var userCuisines by remember { mutableStateOf(listOf<String>()) }
 
+    // Pagination states
+    var lastVisibleDoc by remember { mutableStateOf<DocumentSnapshot?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isLoadingMore by remember { mutableStateOf(false) }
+    var hasMore by remember { mutableStateOf(true) }
+
     fun getMealTypeBasedOnTime(): Set<String> {
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         return when (currentHour) {
-            in 5..11 -> setOf("Breakfast") // Morning
-            in 12..16 -> setOf("Lunch")    // Afternoon
-            else -> setOf("Dinner")        // Night
+            in 5..11 -> setOf("Breakfast")
+            in 12..16 -> setOf("Lunch")
+            else -> setOf("Dinner")
         }
     }
 
@@ -167,9 +179,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             .addOnSuccessListener { document ->
                 userFoodTypes = document.get("foodTypes") as? List<String> ?: emptyList()
                 userCuisines = document.get("cuisines") as? List<String> ?: emptyList()
-                onResult();
+                onResult()
             }
-
     }
 
     fun applyMealFilterForPersonalFoodItem(item: FoodItem): Boolean =
@@ -178,38 +189,39 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     fun applyMealFilterForCommonFoodItem(item: CommonFoodItem): Boolean =
         (selectedEatingTypes.isNotEmpty() && item.eatingTypes.any { it in selectedEatingTypes })
 
-    fun fetch() {
-        val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(
-            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-        )
-
-        db.collection("fooditem").whereEqualTo("userEmail", userEmail).get()
-            .addOnSuccessListener { result ->
-                val items = result.documents.mapNotNull { doc ->
-                    val item = doc.toObject(FoodItem::class.java)
-                        ?.copy(name = doc.getString("name") ?: "")
-                    val last = doc.getString("lastConsumptionDate")?.let {
-                        if (it.isNotEmpty()) {
-                            SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it)
-                        } else {
-                            SimpleDateFormat(
-                                "dd/MM/yyyy",
-                                Locale.getDefault()
-                            ).parse("01/01/1970")
-                        }
+    fun fetchInitial() {
+        isLoading = true
+        fetchUserPreferences {
+            fetchPersonalFoodItems(db, userEmail) { personal ->
+                allPersonalItems = personal
+                filterEligiblePersonalFoodItemsForSuggestion(personal) { personalFiltered ->
+                    filteredPersonalItems = personalFiltered
+                    // Fetch first page of common items
+                    fetchCommonFoodItems(db, userFoodTypes, userCuisines, null, 50) { common, lastDoc ->
+                        val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
+                        commonItems = filtered.shuffled().take(15)
+                        lastVisibleDoc = lastDoc
+                        hasMore = lastDoc != null && common.isNotEmpty()
+                        isLoading = false
                     }
-                    val next = Calendar.getInstance().apply {
-                        time = last ?: Date(0)
-                        add(Calendar.DAY_OF_YEAR, item?.repeatAfter ?: 0)
-                    }.time
-                    if (item != null && next < today) doc.id to item else null
                 }
-                filteredPersonalItems = items
-
-
             }
-
+        }
     }
+
+    fun fetchMore() {
+        if (isLoadingMore || !hasMore) return
+        isLoadingMore = true
+        fetchCommonFoodItems(db, userFoodTypes, userCuisines, lastVisibleDoc, 50) { common, lastDoc ->
+            val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
+            val newItems = filtered.shuffled().take(15)
+            commonItems = commonItems + newItems
+            lastVisibleDoc = lastDoc
+            hasMore = lastDoc != null && common.isNotEmpty()
+            isLoadingMore = false
+        }
+    }
+
     fun confirmCommonFoodItemConsumption(
         commonFoodItem: CommonFoodItem
     ) {
@@ -230,13 +242,13 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 Toast.makeText(context, "Failed to add food item: ${e.message}", Toast.LENGTH_SHORT).show()
             }
     }
+
     fun confirmPersonalFoodItemConsumption(id: String) {
         loadingState[id] = true
         val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
         db.collection("fooditem").document(id)
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
-//                Toast.makeText(context, "Marked as consumed", Toast.LENGTH_SHORT).show()
                 val meal = getMealTypeBasedOnTime().first()
                 val itemName = filteredPersonalItems.find { it.first == id }?.second?.name ?: "your meal"
                 val message = "Hope you enjoyed $itemName in $meal!"
@@ -264,35 +276,16 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 
                 Toast.makeText(context, spannable, Toast.LENGTH_SHORT).show()
                 loadingState.remove(id)
-                fetch()
+                fetchInitial()
             }
     }
 
-    var isLoading by remember { mutableStateOf(true) }
     // Fetch data only once
     LaunchedEffect(Unit) {
-        isLoading = true
-        fetchUserPreferences {
-            fetchPersonalFoodItems(db, userEmail) { personal ->
-                allPersonalItems = personal
-                filterEligiblePersonalFoodItemsForSuggestion(
-                    personal)  { personalFiltered ->
-                    filteredPersonalItems = personalFiltered
-                    fetchCommonFoodItems(db, userFoodTypes, userCuisines) { common ->
-                        commonItems = filterCommonItemsNotInFoodItems(common, allPersonalItems)
-                        isLoading = false
-                    }
-
-                }
-            }
-
-        }
-
-
+        fetchInitial()
     }
 
     if (isLoading) {
-        // Show loading indicator
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -300,98 +293,113 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             CircularProgressIndicator()
         }
     } else {
-    Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showSheet = true },
-                containerColor = MaterialTheme.colorScheme.primary
-            ) {
-                Icon(Icons.Default.FilterList, contentDescription = "Filter")
-            }
-        },
-        topBar = {
-            val message = "Hello " + userName + "! " + "Good " + getWelcomeMessageBasedOnTime() + " Today's " + getMealTypeBasedOnTime().first() + " Suggestions!"
-            CenterAlignedTopAppBar(title = { Text(message) })
-            val meal = getMealTypeBasedOnTime().first()
-            if(selectedEatingTypes.isEmpty())
-                selectedEatingTypes = getMealTypeBasedOnTime()
-            val greeting = getWelcomeMessageBasedOnTime()
+        Scaffold(
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = { showSheet = true },
+                    containerColor = MaterialTheme.colorScheme.primary
+                ) {
+                    Icon(Icons.Default.FilterList, contentDescription = "Filter")
+                }
+            },
+            topBar = {
+                val message = "Hello $userName! Good ${getWelcomeMessageBasedOnTime()} Today's ${getMealTypeBasedOnTime().first()} Suggestions!"
+                CenterAlignedTopAppBar(title = { Text(message) })
+                val meal = getMealTypeBasedOnTime().first()
+                if (selectedEatingTypes.isEmpty())
+                    selectedEatingTypes = getMealTypeBasedOnTime()
+                val greeting = getWelcomeMessageBasedOnTime()
 
-            TopAppBar(
+                TopAppBar(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            brush = Brush.horizontalGradient(
+                                listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))
+                            )
+                        ),
+                    title = {
+                        Column(modifier = Modifier.fillMaxWidth()) {
+                            Text(
+                                text = "Hello, $userName!",
+                                style = MaterialTheme.typography.titleMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = "Good $greeting — Enjoy your $meal suggestions!",
+                                style = MaterialTheme.typography.bodySmall.copy(
+                                    color = Color.White.copy(alpha = 0.9f)
+                                )
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
+                        containerColor = Color.Transparent,
+                        scrolledContainerColor = Color.Transparent
+                    )
+                )
+            },
+            bottomBar = {
+                NavBar(context = LocalContext.current)
+            }
+        ) { padding ->
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))
-                        )
-                    ),
-                title = {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Hello, $userName!",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
-                        )
-                        Spacer(Modifier.height(2.dp))
-                        Text(
-                            text = "Good $greeting — Enjoy your $meal suggestions!",
-                            style = MaterialTheme.typography.bodySmall.copy(
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                LazyColumn(
+                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
+                ) {
+                    item {
+                        GradientHeader("Your Food Items")
+                    }
+                    items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
+                        Spacer(modifier = Modifier.height(16.dp))
+                        FoodItemCard(
+                            item,
+                            false,
+                            onConfirm = { confirmPersonalFoodItemConsumption(id) },
+                            onAdd = {},
+                            isLoading = loadingState[item.name] == true
                         )
                     }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = Color.Transparent,
-                    scrolledContainerColor = Color.Transparent
-                )
-            )
-        },
-        bottomBar = {
-            NavBar(context = LocalContext.current)
-        }
-    ) { padding ->
-        LazyColumn(
-            contentPadding = padding,
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-//            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Personal Items Section
-            item {
-                GradientHeader("Your Food Items")
+                    item {
+                        GradientHeader("Common Food Items")
+                    }
+                    items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
+                        Spacer(modifier = Modifier.height(16.dp))
+                        CommonFoodItemCard(
+                            item = item,
+                            onConfirm = { confirmCommonFoodItemConsumption(item) },
+                            isLoading = false
+                        )
+                    }
+                }
+                if (hasMore) {
+                    Button(
+                        onClick = { fetchMore() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        enabled = !isLoadingMore
+                    ) {
+                        if (isLoadingMore) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Text("More")
+                        }
+                    }
+                }
             }
-            items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
-                Spacer(modifier = Modifier.height(16.dp))
-                FoodItemCard(
-                    item,
-                    false,
-                    onConfirm = { confirmPersonalFoodItemConsumption(id) },
-                    onAdd = {},
-                    isLoading = loadingState[item.name] == true
-                )
-            }
-            // Common Items Section
-            item {
-                GradientHeader("Common Food Items")
-            }
-            items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
-                Spacer(modifier = Modifier.height(16.dp))
-                CommonFoodItemCard(
-                    item = item,
-                    onConfirm = { confirmCommonFoodItemConsumption(item) },
-                    isLoading = false
-                )
-            }
-
         }
     }
-}
     AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
         ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = sheetState) {
             Column(Modifier.padding(16.dp)) {
-
                 Text("When to Eat", style = MaterialTheme.typography.titleMedium)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     eatingTypes.forEach {
@@ -400,7 +408,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         }, label = { Text(it) })
                     }
                 }
-
             }
         }
     }
@@ -442,7 +449,7 @@ fun FoodItemCard(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFE0F7FA), // light cyan
+                            Color(0xFFE0F7FA),
                             Color.White
                         )
                     ),
@@ -500,6 +507,7 @@ fun FoodItemCard(
         }
     }
 }
+
 @Composable
 fun CommonFoodItemCard(
     item: CommonFoodItem,
@@ -519,7 +527,7 @@ fun CommonFoodItemCard(
                 .background(
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color(0xFFE0F7FA), // light cyan
+                            Color(0xFFE0F7FA),
                             Color.White
                         )
                     ),
@@ -533,7 +541,6 @@ fun CommonFoodItemCard(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(item.name, style = MaterialTheme.typography.titleMedium)
-
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -543,7 +550,6 @@ fun CommonFoodItemCard(
                             strokeWidth = 2.dp
                         )
                     } else {
-
                         IconButton(onClick = onConfirm) {
                             Icon(
                                 Icons.Default.Restaurant,
