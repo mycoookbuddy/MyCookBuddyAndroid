@@ -170,13 +170,13 @@ fun ProfileScreenContent(
             iconTint = Color(0xFF7B1FA2),
             onClick = onEditPreferenceClick
         )
-        Spacer(modifier = Modifier.height(12.dp))
-        ProfileOptionCard(
-            icon = Icons.Default.Notifications,
-            label = "Edit Notifications",
-            iconTint = Color(0xFF0288D1),
-            onClick = onEditNotificationsClick
-        )
+//        Spacer(modifier = Modifier.height(12.dp))
+//        ProfileOptionCard(
+//            icon = Icons.Default.Notifications,
+//            label = "Edit Notifications",
+//            iconTint = Color(0xFF0288D1),
+//            onClick = onEditNotificationsClick
+//        )
         Spacer(modifier = Modifier.height(12.dp))
         ProfileOptionCard(
             icon = Icons.Default.Logout,
