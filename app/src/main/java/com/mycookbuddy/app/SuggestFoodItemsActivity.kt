@@ -45,6 +45,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.layout.ContentScale
@@ -153,7 +154,7 @@ fun fetchCommonFoodItems(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     val context = LocalContext.current
@@ -312,7 +313,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 
     if (isLoading) {
         Box(
-            Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) { CircularProgressIndicator() }
         return
@@ -339,7 +340,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         )
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "Good ${getGreeting()} — Enjoy your ${getCurrentMeal()} suggestions!",
+                            "Good ${getWelcomeMessageBasedOnTime()} — Enjoy your ${getMealTypeBasedOnTime()} suggestions!",
                             style = MaterialTheme.typography.bodySmall.copy(
                                 color = Color.White.copy(alpha = 0.9f)
                             )
@@ -375,13 +376,12 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 GradientHeader("Your Food Items")
             }
             // Personal items
-            items(filteredPersonalItems.filter { (_, item) ->
-                item.eatingTypes.any { it in selectedEatingTypes }
-            }) { (id, item) ->
+            items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
+                Spacer(modifier = Modifier.height(16.dp))
                 FoodItemCard(
                     item      = item,
                     isGeneral = false,
-                    onConfirm = { confirmPersonalConsumption(id, db, context, loadingState) },
+                    onConfirm = { confirmPersonalFoodItemConsumption(id) },
                     onAdd     = {},
                     isLoading = loadingState[id] == true,
                     modifier  = Modifier.fillMaxWidth()
@@ -394,28 +394,29 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 GradientHeader("Common Food Items")
             }
             // Common items
-            items(commonItems.filter { (_, item) ->
-                item.eatingTypes.any { it in selectedEatingTypes }
-            }) { (id, item) ->
+            items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
+                Spacer(modifier = Modifier.height(16.dp))
                 CommonFoodItemCard(
                     item      = item,
-                    onConfirm = { confirmCommonConsumption(id, item, db, context, loadingState) },
-                    isLoading = loadingState[id] == true,
+                    onConfirm = { confirmCommonFoodItemConsumption(item) },
+                    isLoading = false,
                     modifier  = Modifier.fillMaxWidth()
                 )
             }
-            if (hasMore) {
-                Button(
-                    onClick = { fetchMore() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    enabled = !isLoadingMore
-                ) {
-                    if (isLoadingMore) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                    } else {
-                        Text("More")
+            item(span = { GridItemSpan(3) }) {
+                if (hasMore) {
+                    Button(
+                        onClick = { fetchMore() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        enabled = !isLoadingMore
+                    ) {
+                        if (isLoadingMore) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Text("More")
+                        }
                     }
                 }
             }
