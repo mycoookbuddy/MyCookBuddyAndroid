@@ -367,42 +367,6 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     }
 }
 
-//private fun confirmPersonalConsumption(
-//    id: String,
-//    db: FirebaseFirestore,
-//    ctx: android.content.Context,
-//    loading: MutableMap<String, Boolean>
-//) {
-//    loading[id] = true
-//    val today = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-//    db.collection("fooditem").document(id)
-//        .update("lastConsumptionDate", today)
-//        .addOnSuccessListener {
-//            Toast.makeText(ctx, "Marked as consumed", Toast.LENGTH_SHORT).show()
-//            loading.remove(id)
-//        }
-//}
-//
-//private fun confirmCommonConsumption(
-//    item: CommonFoodItem,
-//    db: FirebaseFirestore,
-//    ctx: android.content.Context
-//) {
-//    val record = FoodItem(
-//        name                = item.name,
-//        type                = item.type,
-//        eatingTypes         = item.eatingTypes,
-//        lastConsumptionDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
-//        userEmail           = userEmail
-//    )
-//    db.collection("fooditem")
-//        .add(record)
-//        .addOnSuccessListener {
-//            Toast.makeText(ctx, "Food item added!", Toast.LENGTH_SHORT).show()
-//        }
-//}
-
-
 
 @Composable
 fun GradientHeader(text: String) {
