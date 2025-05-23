@@ -9,8 +9,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -32,6 +33,7 @@ import java.util.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.text.style.TextOverflow
 
 class SuggestFoodItemsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -128,6 +130,117 @@ fun fetchCommonFoodItems(
     }
 }
 
+@Composable
+fun CommonFoodItemsGrid(
+    items: List<CommonFoodItem>,
+    onConfirm: (CommonFoodItem) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(items) { item ->
+            // For CommonFoodItemsGrid and FoodItemsGrid
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp)
+                ) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Button(
+                        onClick = { onConfirm(item) }, // or onConfirm(id) for FoodItemsGrid
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 2.dp)
+                    ) {
+                        Text("Go for it")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FoodItemsGrid(
+    items: List<Pair<String, FoodItem>>,
+    onConfirm: (String) -> Unit
+) {
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(3),
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(items) { (id, item) ->
+            // For CommonFoodItemsGrid and FoodItemsGrid
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp),
+                shape = RoundedCornerShape(12.dp),
+                elevation = CardDefaults.cardElevation(4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(2.dp)
+                ) {
+                    Text(
+                        text = item.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .fillMaxWidth(),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Button(
+                        onClick = { onConfirm(id) }, // or onConfirm(id) for FoodItemsGrid
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 2.dp)
+                    ) {
+                        Text("Go for it")
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+fun GradientHeader(text: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                brush = Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(12.dp)
+    ) {
+        Text(text, color = Color.White, fontSize = 18.sp)
+    }
+}
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
@@ -197,7 +310,13 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 filterEligiblePersonalFoodItemsForSuggestion(personal) { personalFiltered ->
                     filteredPersonalItems = personalFiltered
                     // Fetch first page of common items
-                    fetchCommonFoodItems(db, userFoodTypes, userCuisines, null, 50) { common, lastDoc ->
+                    fetchCommonFoodItems(
+                        db,
+                        userFoodTypes,
+                        userCuisines,
+                        null,
+                        50
+                    ) { common, lastDoc ->
                         val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
                         commonItems = filtered.shuffled().take(15)
                         lastVisibleDoc = lastDoc
@@ -212,7 +331,13 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     fun fetchMore() {
         if (isLoadingMore || !hasMore) return
         isLoadingMore = true
-        fetchCommonFoodItems(db, userFoodTypes, userCuisines, lastVisibleDoc, 50) { common, lastDoc ->
+        fetchCommonFoodItems(
+            db,
+            userFoodTypes,
+            userCuisines,
+            lastVisibleDoc,
+            50
+        ) { common, lastDoc ->
             val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
             val newItems = filtered.shuffled().take(15)
             commonItems = commonItems + newItems
@@ -229,7 +354,10 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             name = commonFoodItem.name,
             type = commonFoodItem.type,
             eatingTypes = commonFoodItem.eatingTypes,
-            lastConsumptionDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date()),
+            lastConsumptionDate = SimpleDateFormat(
+                "dd/MM/yyyy",
+                Locale.getDefault()
+            ).format(Date()),
             userEmail = userEmail
         )
 
@@ -237,9 +365,11 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             .add(foodItem)
             .addOnSuccessListener {
                 Toast.makeText(context, "Food item added successfully!", Toast.LENGTH_SHORT).show()
+                fetchInitial() // Refresh the screen
             }
             .addOnFailureListener { e ->
-                Toast.makeText(context, "Failed to add food item: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "Failed to add food item: ${e.message}", Toast.LENGTH_SHORT)
+                    .show()
             }
     }
 
@@ -250,7 +380,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
                 val meal = getMealTypeBasedOnTime().first()
-                val itemName = filteredPersonalItems.find { it.first == id }?.second?.name ?: "your meal"
+                val itemName =
+                    filteredPersonalItems.find { it.first == id }?.second?.name ?: "your meal"
                 val message = "Hope you enjoyed $itemName in $meal!"
                 val spannable = android.text.SpannableString(message)
 
@@ -303,7 +434,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 }
             },
             topBar = {
-                val message = "Hello $userName! Good ${getWelcomeMessageBasedOnTime()} Today's ${getMealTypeBasedOnTime().first()} Suggestions!"
+                val message =
+                    "Hello $userName! Good ${getWelcomeMessageBasedOnTime()} Today's ${getMealTypeBasedOnTime().first()} Suggestions!"
                 CenterAlignedTopAppBar(title = { Text(message) })
                 val meal = getMealTypeBasedOnTime().first()
                 if (selectedEatingTypes.isEmpty())
@@ -351,220 +483,85 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                     .fillMaxSize()
                     .padding(padding)
             ) {
-                LazyColumn(
-                    modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
-                ) {
+                // Inside the Column in Scaffold content
+                // Replace LazyColumn with Column in your Scaffold content
+
                     if (filteredPersonalItems.any { applyMealFilterForPersonalFoodItem(it.second) }) {
-                        item {
-                            GradientHeader("Smart Suggestions")
-                        }
-                    }
-                    items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
-                        Spacer(modifier = Modifier.height(16.dp))
-                        FoodItemCard(
-                            item,
-                            false,
-                            onConfirm = { confirmPersonalFoodItemConsumption(id) },
-                            onAdd = {},
-                            isLoading = loadingState[item.name] == true
+                        val sortedPersonalItems = filteredPersonalItems
+                            .filter { applyMealFilterForPersonalFoodItem(it.second) }
+                            .sortedBy {
+                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it.second.lastConsumptionDate)
+                            }
+                        GradientHeader(
+                            text = "Smart Suggestions",
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
+                        FoodItemsGrid(
+                            items = sortedPersonalItems.filter {
+                                applyMealFilterForPersonalFoodItem(
+                                    it.second
+                                )
+                            },
+                            onConfirm = { confirmPersonalFoodItemConsumption(it) }
                         )
                     }
-                    item {
-                        GradientHeader("Popular Recipes")
-                    }
-                    items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
-                        Spacer(modifier = Modifier.height(16.dp))
-                        CommonFoodItemCard(
-                            item = item,
-                            onConfirm = { confirmCommonFoodItemConsumption(item) },
-                            isLoading = false
-                        )
-                    }
-                }
-                if (hasMore) {
-                    Button(
-                        onClick = { fetchMore() },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        enabled = !isLoadingMore
-                    ) {
-                        if (isLoadingMore) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                        } else {
-                            Text("More")
-                        }
-                    }
-                }
-            }
-        }
-    }
-    AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
-        ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = sheetState) {
-            Column(Modifier.padding(16.dp)) {
-                Text("When to Eat", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    eatingTypes.forEach {
-                        FilterChip(selected = selectedEatingTypes.contains(it), onClick = {
-                            selectedEatingTypes = selectedEatingTypes.toggle(it)
-                        }, label = { Text(it) })
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun GradientHeader(text: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                brush = Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA))),
-                shape = RoundedCornerShape(8.dp)
-            )
-            .padding(12.dp)
-    ) {
-        Text(text, color = Color.White, fontSize = 18.sp)
-    }
-}
-
-@Composable
-fun FoodItemCard(
-    item: FoodItem,
-    isGeneral: Boolean,
-    onConfirm: () -> Unit,
-    onAdd: () -> Unit,
-    isLoading: Boolean
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFE0F7FA),
-                            Color.White
-                        )
-                    ),
-                    shape = RoundedCornerShape(12.dp)
+                GradientHeader(
+                    text = "Popular Recipes",
+                    modifier = Modifier.padding(top = 12.dp)
                 )
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(item.name, style = MaterialTheme.typography.titleMedium)
-                    if (item.lastConsumptionDate.isNotEmpty()) {
-                        Text(
-                            "Consumed on: ${item.lastConsumptionDate}",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    } else if (!isGeneral) {
-                        Text(
-                            "Never consumed",
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
-                    }
-                }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
+                    val filteredPopularRecipes =
+                        commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }
+                    if (filteredPopularRecipes.isEmpty()) {
+                        hasMore = false
+                        Text(
+                            "I am sorry, no suggestions for today",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            color = Color.Gray,
+                            fontSize = 16.sp
                         )
                     } else {
-                        if (isGeneral) {
-                            IconButton(onClick = onAdd) {
-                                Icon(
-                                    Icons.Default.AddCircle,
-                                    contentDescription = "Add to Personal",
-                                    tint = Color(0xFF26A69A)
-                                )
+                        CommonFoodItemsGrid(
+                            items = filteredPopularRecipes.map { it.second },
+                            onConfirm = { confirmCommonFoodItemConsumption(it) }
+                        )
+                    }
+                    if (hasMore) {
+                        Button(
+                            onClick = { fetchMore() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            enabled = !isLoadingMore
+                        ) {
+                            if (isLoadingMore) {
+                                CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                            } else {
+                                Text("More")
                             }
                         }
-                        IconButton(onClick = onConfirm) {
-                            Icon(
-                                Icons.Default.Restaurant,
-                                contentDescription = "Ate",
-                                tint = Color(0xFFEF5350)
-                            )
+                    }
+                }
+            }
+        }
+        AnimatedVisibility(showSheet, enter = fadeIn(), exit = fadeOut()) {
+            ModalBottomSheet(onDismissRequest = { showSheet = false }, sheetState = sheetState) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("When to Eat", style = MaterialTheme.typography.titleMedium)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        eatingTypes.forEach {
+                            FilterChip(selected = selectedEatingTypes.contains(it), onClick = {
+                                selectedEatingTypes = selectedEatingTypes.toggle(it)
+                            }, label = { Text(it) })
                         }
                     }
                 }
             }
         }
     }
-}
 
-@Composable
-fun CommonFoodItemCard(
-    item: CommonFoodItem,
-    onConfirm: () -> Unit,
-    isLoading: Boolean
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-    ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color(0xFFE0F7FA),
-                            Color.White
-                        )
-                    ),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(item.name, style = MaterialTheme.typography.titleMedium)
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        IconButton(onClick = onConfirm) {
-                            Icon(
-                                Icons.Default.Restaurant,
-                                contentDescription = "Ate",
-                                tint = Color(0xFFEF5350)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 fun Set<String>.toggle(item: String): Set<String> =
-    if (contains(item)) this - item else this + item
+        if (contains(item)) this - item else this + item
