@@ -52,13 +52,13 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
-    implementation(libs.androidx.compose.material) // Material2 (optional)
 
     // ✅ Material3 - REQUIRED for SwipeToDismiss
     implementation(libs.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation("com.google.accompanist:accompanist-flowlayout:0.30.1")
     implementation("androidx.compose.material3:material3:1.2.1")
+    implementation("androidx.compose.ui:ui:1.5.0")
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
 
 

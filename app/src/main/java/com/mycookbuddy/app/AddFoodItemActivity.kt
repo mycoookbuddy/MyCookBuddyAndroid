@@ -15,6 +15,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -25,10 +26,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mycookbuddy.app.component.CheckboxGroup
+import com.mycookbuddy.app.component.SegmentedControl
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -95,152 +100,175 @@ class AddFoodItemActivity : ComponentActivity() {
 fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var name by remember { mutableStateOf(TextFieldValue("")) }
-    var selectedType by remember { mutableStateOf("Veg") } // Default selected
-    var selectedEatingTypes by remember { mutableStateOf(setOf("Breakfast")) } // Default selected
-    var repeatAfter by remember { mutableStateOf(TextFieldValue("")) }
+
+    var name by remember { mutableStateOf("") }
+    var selectedType by remember { mutableStateOf("Veg") }
+    var selectedEatingTypes by remember { mutableStateOf(setOf<String>()) }
+    var repeatAfter by remember { mutableStateOf("") }
     var showLoading by remember { mutableStateOf(false) }
-    var nameShake by remember { mutableStateOf(false) }
-    var typeShake by remember { mutableStateOf(false) }
-    var mealShake by remember { mutableStateOf(false) }
-    var repeatShake by remember { mutableStateOf(false) }
+    var showSuccess by remember { mutableStateOf(false) }
 
-    val foodTypeColors = mapOf(
-        "Veg" to Color(0xFFA5D6A7),
-        "Non Veg" to Color(0xFFEF9A9A),
-        "Eggy" to Color(0xFFFFE082),
-        "Vegan" to Color(0xFF80CBC4)
-    )
+    LaunchedEffect(showSuccess) {
+        if (showSuccess) {
+            delay(1200)
+            (context as? ComponentActivity)?.finish()
+        }
+    }
 
-    val mealTypeColors = mapOf(
-        "Breakfast" to Color(0xFFFFF59D),
-        "Lunch" to Color(0xFF90CAF9),
-        "Dinner" to Color(0xFFCE93D8)
-    )
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Add Food Item", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = { (context as? ComponentActivity)?.finish() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                modifier = Modifier.background(
-                    Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA)))
-                ),
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        floatingActionButton = {
-            if (!showLoading) {
-                FloatingActionButton(
-                    onClick = {
-                        nameShake = name.text.isBlank()
-                        typeShake = selectedType.isBlank()
-                        mealShake = selectedEatingTypes.isEmpty()
-                        repeatShake = repeatAfter.text.toIntOrNull() == null
-
-                        if (nameShake || typeShake || mealShake || repeatShake) return@FloatingActionButton
-
-                        coroutineScope.launch {
-                            showLoading = true
-                            delay(1000)
-                            showLoading = false
-                            onSaveClick(
-                                FoodItem(
-                                    name = name.text,
-                                    type = selectedType,
-                                    eatingTypes = selectedEatingTypes.toList(),
-                                    repeatAfter = repeatAfter.text.toIntOrNull() ?: 0,
-                                    userEmail = userEmail
-                                )
-                            )
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Add Food Item", color = Color.White) },
+                    navigationIcon = {
+                        IconButton(onClick = { (context as? ComponentActivity)?.finish() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
                         }
                     },
-                    containerColor = Color(0xFF26C6DA),
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.White)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+                    modifier = Modifier.background(
+                        Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA)))
+                    )
+                )
+            }
+        ) { padding ->
+            Column(
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (!showLoading) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                        ) {
+                            Box(
+                                Modifier
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF42A5F5), Color(0xFF26C6DA))
+                                        )
+                                    )
+                                    .padding(16.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OutlinedTextField(
+                                        value = name,
+                                        onValueChange = { name = it },
+                                        label = { Text("Food Name", color = Color.White) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Fastfood, contentDescription = null, tint = Color.White)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Text("Select Type", color = Color.White)
+                                    SegmentedControl(
+                                        options = listOf("Veg", "Non Veg", "Eggy", "Vegan"),
+                                        selectedOption = selectedType,
+                                        onOptionSelected = { selectedType = it },
+                                        columns = 2,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                    )
+
+                                    Text("Meal Preferences", color = Color.White)
+                                    CheckboxGroup(
+                                        options = listOf("Breakfast", "Lunch", "Dinner"),
+                                        selectedOptions = selectedEatingTypes,
+                                        onOptionToggle = { selectedEatingTypes = selectedEatingTypes.toggle(it) },
+                                        columns = 1,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                    )
+
+                                    OutlinedTextField(
+                                        value = repeatAfter,
+                                        onValueChange = {
+                                            if (it.all(Char::isDigit)) repeatAfter = it
+                                        },
+                                        label = { Text("Repeat After (days)", color = Color.White) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                if (name.isBlank() || selectedEatingTypes.isEmpty() || repeatAfter.isBlank()) {
+                                    Toast.makeText(context, "Please fill all fields", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
+                                coroutineScope.launch {
+                                    showLoading = true
+                                    delay(500)
+                                    onSaveClick(
+                                        FoodItem(
+                                            name = name,
+                                            type = selectedType,
+                                            eatingTypes = selectedEatingTypes.toList(),
+                                            repeatAfter = repeatAfter.toIntOrNull() ?: 0,
+                                            userEmail = userEmail
+                                        )
+                                    )
+                                    showLoading = false
+                                    showSuccess = true
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26C6DA))
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.padding(start = 8.dp))
+                            Text("Save", color = Color.White)
+                        }
+                    }
                 }
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(18.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            if (showLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Fastfood, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Food Name", style = MaterialTheme.typography.bodyMedium)
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White, shape = RoundedCornerShape(12.dp)),
-                    isError = nameShake
-                )
 
-                Text("Select Type", style = MaterialTheme.typography.titleMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("Veg", "Non Veg", "Eggy", "Vegan").forEach { type ->
-                        AssistChip(
-                            onClick = { selectedType = type },
-                            label = { Text(type, style = MaterialTheme.typography.bodyMedium) },
-                            shape = CircleShape,
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selectedType == type) foodTypeColors[type] ?: Color(0xFFB2EBF2) else Color.White
+        if (showSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Card(
+                        shape = CircleShape,
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(10.dp),
+                        modifier = Modifier.size(120.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Success",
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(64.dp)
                             )
-                        )
-                    }
-                }
-
-                Text("Meal Preferences", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
-                        ElevatedFilterChip(
-                            selected = selectedEatingTypes.contains(type),
-                            onClick = {
-                                selectedEatingTypes = if (selectedEatingTypes.contains(type))
-                                    selectedEatingTypes - type else selectedEatingTypes + type
-                            },
-                            label = { Text(type, style = MaterialTheme.typography.bodyMedium) },
-                            colors = FilterChipDefaults.elevatedFilterChipColors(
-                                selectedContainerColor = mealTypeColors[type] ?: Color(0xFFE0F7FA)
-                            )
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = repeatAfter,
-                    onValueChange = { repeatAfter = it },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Repeat After (days)", style = MaterialTheme.typography.bodyMedium)
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color.White, shape = RoundedCornerShape(12.dp)),
-                    isError = repeatShake
-                )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Food item added successfully in your personal list.", color = Color.White, fontSize = 18.sp)
+                }
             }
         }
     }
 }
+
+private fun <T> Set<T>.toggle(item: T): Set<T> = if (contains(item)) minus(item) else plus(item)
+
