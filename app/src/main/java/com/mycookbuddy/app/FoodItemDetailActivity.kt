@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
@@ -91,7 +92,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                                 .document(documentId)
                                 .set(foodItem)
                                 .addOnSuccessListener {
-                                    Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
+//                                    Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
                                     refreshHomeScreen(this, true)
                                     setResult(RESULT_OK)
                                     finish()
@@ -105,7 +106,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                             firestore.collection("fooditem")
                                 .add(newFoodItem)
                                 .addOnSuccessListener {
-                                    Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
+//                                    Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
                                     refreshHomeScreen(this, true)
                                     setResult(RESULT_OK)
                                     finish()
