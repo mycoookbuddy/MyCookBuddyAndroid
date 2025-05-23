@@ -354,8 +354,10 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 LazyColumn(
                     modifier = Modifier.weight(1f).padding(horizontal = 16.dp)
                 ) {
-                    item {
-                        GradientHeader("Your Food Items")
+                    if (filteredPersonalItems.any { applyMealFilterForPersonalFoodItem(it.second) }) {
+                        item {
+                            GradientHeader("Smart Suggestions")
+                        }
                     }
                     items(filteredPersonalItems.filter { applyMealFilterForPersonalFoodItem(it.second) }) { (id, item) ->
                         Spacer(modifier = Modifier.height(16.dp))
@@ -368,7 +370,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         )
                     }
                     item {
-                        GradientHeader("Common Food Items")
+                        GradientHeader("Popular Recipes")
                     }
                     items(commonItems.filter { applyMealFilterForCommonFoodItem(it.second) }) { (_, item) ->
                         Spacer(modifier = Modifier.height(16.dp))
