@@ -12,7 +12,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Fastfood
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,8 +27,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.component.CheckboxGroup
 import com.mycookbuddy.app.component.SegmentedControl
@@ -34,6 +38,7 @@ import java.util.*
 
 class FoodItemDetailActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
+    private var showLoading by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,52 +51,77 @@ class FoodItemDetailActivity : ComponentActivity() {
                 FoodItemDetailScreen(
                     userEmail = userEmail,
                     foodItemName = foodItemName,
+                    onLoadingChange = { showLoading = it },
                     onSaveClick = { updatedFoodItem ->
-                        saveFoodItemToFirestore(updatedFoodItem, userEmail, foodItemName)
+                        saveFoodItemToFirestore(updatedFoodItem, userEmail, foodItemName, onLoadingChange = { showLoading = it })
                     }
                 )
             }
         }
     }
 
-    private fun saveFoodItemToFirestore(foodItem: FoodItem, userEmail: String, originalName: String) {
+    private fun saveFoodItemToFirestore(
+        foodItem: FoodItem,
+        userEmail: String,
+        originalName: String,
+        onLoadingChange: (Boolean) -> Unit
+    ) {
+        val newName = foodItem.name.trim()
+        // Check for duplicate name (excluding the current item)
         firestore.collection("fooditem")
             .whereEqualTo("userEmail", userEmail)
-            .whereEqualTo("name", originalName)
+            .whereEqualTo("name", newName)
             .get()
             .addOnSuccessListener { result ->
-                if (result.documents.isNotEmpty()) {
-                    val documentId = result.documents[0].id
-                    firestore.collection("fooditem")
-                        .document(documentId)
-                        .set(foodItem)
-                        .addOnSuccessListener {
-//                            Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
-                            refreshHomeScreen(this, true)
-                            setResult(RESULT_OK)
-                            finish()
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("Firestore", "Error updating food item", e)
-                            Toast.makeText(this, "Failed to update food item", Toast.LENGTH_SHORT).show()
-                        }
-                } else {
-                    firestore.collection("fooditem")
-                        .add(foodItem.copy(userEmail = userEmail))
-                        .addOnSuccessListener {
-                            Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
-                            refreshHomeScreen(this, true)
-                            setResult(RESULT_OK)
-                            finish()
-                        }
-                        .addOnFailureListener { e ->
-                            Log.e("Firestore", "Error saving new food item", e)
-                            Toast.makeText(this, "Failed to save food item", Toast.LENGTH_SHORT).show()
-                        }
+                val isDuplicate = result.documents.any { it.getString("name") == newName && newName != originalName }
+                if (isDuplicate) {
+                    Toast.makeText(this, "A food item with this name already exists.", Toast.LENGTH_SHORT).show()
+                    onLoadingChange(false)
+                    return@addOnSuccessListener
                 }
+                // Proceed with original save logic
+                firestore.collection("fooditem")
+                    .whereEqualTo("userEmail", userEmail)
+                    .whereEqualTo("name", originalName)
+                    .get()
+                    .addOnSuccessListener { result2 ->
+                        if (result2.documents.isNotEmpty()) {
+                            val documentId = result2.documents[0].id
+                            firestore.collection("fooditem")
+                                .document(documentId)
+                                .set(foodItem)
+                                .addOnSuccessListener {
+                                    Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
+                                    refreshHomeScreen(this, true)
+                                    setResult(RESULT_OK)
+                                    finish()
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("Firestore", "Error updating food item", e)
+                                    Toast.makeText(this, "Failed to update food item", Toast.LENGTH_SHORT).show()
+                                }
+                        } else {
+                            val newFoodItem = foodItem.copy(userEmail = userEmail)
+                            firestore.collection("fooditem")
+                                .add(newFoodItem)
+                                .addOnSuccessListener {
+                                    Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
+                                    refreshHomeScreen(this, true)
+                                    setResult(RESULT_OK)
+                                    finish()
+                                }
+                                .addOnFailureListener { e ->
+                                    Log.e("Firestore", "Error saving new food item", e)
+                                    Toast.makeText(this, "Failed to save food item", Toast.LENGTH_SHORT).show()
+                                }
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Firestore", "Error fetching food item", e)
+                    }
             }
             .addOnFailureListener { e ->
-                Log.e("Firestore", "Error fetching food item", e)
+                Log.e("Firestore", "Error checking duplicate food item", e)
             }
     }
 }
@@ -101,6 +131,7 @@ class FoodItemDetailActivity : ComponentActivity() {
 fun FoodItemDetailScreen(
     userEmail: String,
     foodItemName: String,
+    onLoadingChange: (Boolean) -> Unit,
     onSaveClick: (FoodItem) -> Unit
 ) {
     val context = LocalContext.current
@@ -209,7 +240,6 @@ fun FoodItemDetailScreen(
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     )
-
                                     Text("Select Type", color = Color.White, fontSize = 16.sp)
                                     SegmentedControl(
                                         options = listOf("Veg", "Non Veg", "Eggy", "Vegan"),

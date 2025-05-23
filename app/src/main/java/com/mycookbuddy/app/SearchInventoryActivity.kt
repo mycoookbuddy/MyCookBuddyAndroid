@@ -155,52 +155,76 @@ class SearchInventoryActivity : ComponentActivity() {
 
 
                 Spacer(Modifier.height(12.dp))
-
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(filteredItems) { item ->
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            elevation = CardDefaults.cardElevation(6.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
-                        ) {
-                            Box(
+                if (filteredItems.isEmpty()) {
+                    Text(
+                        "No items found to search",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        color = Color.Gray,
+                        fontSize = 16.sp
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        items(filteredItems) { item ->
+                            Card(
                                 modifier = Modifier
-                                    .background(
-                                        brush = Brush.verticalGradient(
-                                            colors = listOf(
-                                                Color(0xFFE0F7FA),
-                                                Color.White
-                                            )
-                                        ),
-                                        shape = RoundedCornerShape(12.dp)
-                                    )
-                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                elevation = CardDefaults.cardElevation(6.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.Transparent)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(
+                                                    Color(0xFFE0F7FA),
+                                                    Color.White
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(12.dp)
+                                        )
+                                        .padding(horizontal = 12.dp, vertical = 10.dp)
                                 ) {
-                                    Column(Modifier.weight(1f)) {
-                                        Text(item.name, style = MaterialTheme.typography.titleMedium)
-                                    }
-                                    IconButton(onClick = {
-                                        scope.launch {
-                                            addItemToUserCollection(userEmail, item)
-                                            allItems = allItems.filter { it.name != item.name }
-                                            updateFilteredItems(allItems, selectedMealTypes, selectedFoodTypes, selectedCuisines, searchText.text) {
-                                                filteredItems = it
-                                            }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column(Modifier.weight(1f)) {
+                                            Text(
+                                                item.name,
+                                                style = MaterialTheme.typography.titleMedium
+                                            )
                                         }
-                                    }) {
-                                        Icon(Icons.Default.AddCircle, contentDescription = "Add", tint = Color(0xFF26A69A))
+                                        IconButton(onClick = {
+                                            scope.launch {
+                                                addItemToUserCollection(userEmail, item)
+                                                allItems = allItems.filter { it.name != item.name }
+                                                updateFilteredItems(
+                                                    allItems,
+                                                    selectedMealTypes,
+                                                    selectedFoodTypes,
+                                                    selectedCuisines,
+                                                    searchText.text
+                                                ) {
+                                                    filteredItems = it
+                                                }
+                                            }
+                                        }) {
+                                            Icon(
+                                                Icons.Default.AddCircle,
+                                                contentDescription = "Add",
+                                                tint = Color(0xFF26A69A)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
-                    }}
+                    }
+                }
             }
         }
 

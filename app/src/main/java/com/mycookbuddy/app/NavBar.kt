@@ -21,7 +21,7 @@ fun NavBar(context: Context) {
         "Search" to SearchInventoryActivity::class.java,
         "Manage" to FoodItemListActivity::class.java,
         "Profile" to ProfileActivity::class.java,
-        "Help" to HelpActivity::class.java
+        "Support" to HelpActivity::class.java
     )
 
     val currentActivityName = context::class.java.simpleName

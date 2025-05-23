@@ -8,8 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -20,22 +18,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
-import com.mycookbuddy.app.R
-import kotlinx.coroutines.delay
 
 class SettingsActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
@@ -50,11 +45,6 @@ class SettingsActivity : ComponentActivity() {
                 SettingsScreen(
                     onSave = { selectedCuisines, selectedFoodTypes ->
                         userEmail?.let { savePreferences(it, selectedCuisines, selectedFoodTypes) }
-                    },
-                    onSkip = {
-                        val intent = Intent(this, SuggestFoodItemsActivity::class.java)
-                        startActivity(intent)
-                        finish()
                     }
                 )
             }
@@ -147,13 +137,13 @@ class SettingsActivity : ComponentActivity() {
 
     @Composable
     fun SettingsScreen(
-        onSave: (List<String>, List<String>) -> Unit,
-        onSkip : () -> Unit
+        onSave: (List<String>, List<String>) -> Unit
     ) {
         val firestore = FirebaseFirestore.getInstance()
         var cuisines by remember { mutableStateOf<List<String>>(emptyList()) }
         val selectedCuisines = remember { mutableStateListOf<String>() }
         val selectedFoodTypes = remember { mutableStateListOf<String>() }
+        val context = LocalContext.current
 
         val foodTypeIcons = mapOf(
             "Veg" to R.drawable.vegetarian_4x,
@@ -170,17 +160,26 @@ class SettingsActivity : ComponentActivity() {
         )
 
         LaunchedEffect(Unit) {
-            // Fetch cuisines and select all by default
+            // Fetch cuisines list
             firestore.collection("cuisine").get()
                 .addOnSuccessListener { results ->
-                    cuisines = results.documents.mapNotNull { doc ->
-                        doc.getString("name")
-                    }
-                 //   selectedCuisines.addAll(cuisines) // Select all cuisines by default
+                    cuisines = results.documents.mapNotNull { doc -> doc.getString("name") }
                 }
 
-            // Select all food types by default
-         //   selectedFoodTypes.addAll(foodTypeIcons.keys)
+            // Fetch user preferences
+            val user = GoogleSignIn.getLastSignedInAccount(context)
+            val userEmail = user?.email
+            if (userEmail != null) {
+                firestore.collection("users").document(userEmail).get()
+                    .addOnSuccessListener { doc ->
+                        val userCuisines = doc.get("cuisines") as? List<String>
+                        val userFoodTypes = doc.get("foodTypes") as? List<String>
+                        selectedCuisines.clear()
+                        selectedFoodTypes.clear()
+                        if (userCuisines != null) selectedCuisines.addAll(userCuisines)
+                        if (userFoodTypes != null) selectedFoodTypes.addAll(userFoodTypes)
+                    }
+            }
         }
 
         Column(
