@@ -53,6 +53,8 @@ class ProfileActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 var showDeleteDialog by remember { mutableStateOf(false) }
+                var showSignOutDialog by remember { mutableStateOf(false) }
+
 
                 ProfileScreenWithNavBar(
                     userName = userName,
@@ -68,23 +70,41 @@ class ProfileActivity : ComponentActivity() {
                         intent.putExtra("USER_EMAIL", userEmail)
                         startActivity(intent)
                     },
-                    onSignOutClick = {
-                        googleSignInClient.signOut().addOnCompleteListener {
-                            Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
-                            startActivity(Intent(this, MainActivity::class.java))
-                            finish()
-                        }
-                    },
+                    onSignOutClick = { showSignOutDialog = true },
+
                     onDeleteAccountClick = {
                         showDeleteDialog = true
                     }
                 )
-
+                if (showSignOutDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showSignOutDialog = false },
+                        title = { Text("Sign Out") },
+                        text = { Text("Are you sure you want to sign out?") },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showSignOutDialog = false
+                                googleSignInClient.signOut().addOnCompleteListener {
+                                    Toast.makeText(this, "Signed out successfully", Toast.LENGTH_SHORT).show()
+                                    startActivity(Intent(this, MainActivity::class.java))
+                                    finish()
+                                }
+                            }) {
+                                Text("Yes")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showSignOutDialog = false }) {
+                                Text("No")
+                            }
+                        }
+                    )
+                }
                 if (showDeleteDialog) {
                     AlertDialog(
                         onDismissRequest = { showDeleteDialog = false },
                         title = { Text("Delete Account") },
-                        text = { Text("Are you sure you want to delete your account?") },
+                        text = { Text("Are you sure you want to delete your account? This will permanently erase all your data and cannot be undone. It will be as if you never used the app.") },
                         confirmButton = {
                             TextButton(onClick = {
                                 showDeleteDialog = false

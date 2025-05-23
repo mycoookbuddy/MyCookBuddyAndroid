@@ -9,6 +9,7 @@ import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -71,15 +73,39 @@ fun LoadingIndicator(message: String) {
             if (isLoading) {
                 LoadingIndicator(message = loadingMessage)
             } else {
-                Button(
-                    onClick = {
-                        isLoading = true
-                        loadingMessage = "Signing in..."
-                        signIn()
-                    },
-                    modifier = Modifier.align(Alignment.Center)
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Sign In with Google")
+                    Image(
+                        painter = painterResource(id = R.drawable.chef),
+                        contentDescription = "Chef thinking",
+                        modifier = Modifier
+                            .size(120.dp)
+                            .padding(bottom = 16.dp)
+                    )
+                    Text(
+                        text = "Not sure what to cook?",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Let us help you decide, avoid repeats, and plan smarter meals. Sign in to get started!",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Button(
+                        onClick = {
+                            isLoading = true
+                            loadingMessage = "Signing in..."
+                            signIn()
+                        }
+                    ) {
+                        Text("Sign In with Google")
+                    }
                 }
             }
         }

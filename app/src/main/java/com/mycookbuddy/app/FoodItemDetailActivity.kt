@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -22,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import com.google.firebase.firestore.FirebaseFirestore
@@ -31,6 +33,7 @@ import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.*
+import kotlin.toString
 
 class FoodItemDetailActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
@@ -110,6 +113,7 @@ fun FoodItemDetailScreen(
     var eatingType by remember { mutableStateOf(setOf<String>()) }
     var selectedType by remember { mutableStateOf("") }
     var showLoading by remember { mutableStateOf(false) }
+    var repeatAfterText by remember { mutableStateOf(foodItem.repeatAfter?.toString() ?: "") }
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = DatePickerDialog(
@@ -122,7 +126,7 @@ fun FoodItemDetailScreen(
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
     )
-
+    datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
     LaunchedEffect(foodItemName) {
         val firestore = FirebaseFirestore.getInstance()
         firestore.collection("fooditem")
@@ -142,6 +146,7 @@ fun FoodItemDetailScreen(
                     lastConsumptionDate = foodItem.lastConsumptionDate
                     eatingType = foodItem.eatingTypes.toSet()
                     selectedType = foodItem.type
+                    repeatAfterText = foodItem.repeatAfter?.toString() ?: ""
                 }
             }
             .addOnFailureListener { e ->
@@ -234,8 +239,14 @@ fun FoodItemDetailScreen(
                 }
 
                 OutlinedTextField(
-                    value = foodItem.repeatAfter.toString(),
-                    onValueChange = { foodItem = foodItem.copy(repeatAfter = it.toIntOrNull() ?: 0) },
+                    value = repeatAfterText,
+                    onValueChange = {
+                        // Only update if input is empty or numeric
+                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
+                            repeatAfterText = it
+                            foodItem = foodItem.copy(repeatAfter = it.toIntOrNull())
+                        }
+                    },
                     label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -243,16 +254,19 @@ fun FoodItemDetailScreen(
                             Text("Repeat After (days)")
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                 )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Last Consumed On", modifier = Modifier.padding(end = 8.dp))
+                    Button(
+                        onClick = { datePickerDialog.show() },
 
-                Button(
-                    onClick = { datePickerDialog.show() },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Icon(Icons.Default.CalendarToday, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text(if (lastConsumptionDate.isEmpty()) "Pick Last Consumed Date" else lastConsumptionDate)
+                    ) {
+                        Icon(Icons.Default.CalendarToday, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text(if (lastConsumptionDate.isEmpty()) "Choose date" else lastConsumptionDate)
+                    }
                 }
             }
         }

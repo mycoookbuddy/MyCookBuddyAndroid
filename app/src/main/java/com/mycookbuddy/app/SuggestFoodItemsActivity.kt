@@ -74,7 +74,7 @@ fun filterEligiblePersonalFoodItemsForSuggestion(
         }
         val next = Calendar.getInstance().apply {
             time = last ?: Date(0)
-            add(Calendar.DAY_OF_YEAR, personalFoodItem.second.repeatAfter)
+            personalFoodItem.second.repeatAfter?.let { add(Calendar.DAY_OF_YEAR, it) }
         }.time
         if (next < today) personalFoodItem else null
     }
