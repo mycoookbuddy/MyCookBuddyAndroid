@@ -490,7 +490,12 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         val sortedPersonalItems = filteredPersonalItems
                             .filter { applyMealFilterForPersonalFoodItem(it.second) }
                             .sortedBy {
-                                SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(it.second.lastConsumptionDate)
+                                val dateStr = it.second.lastConsumptionDate
+                                if (dateStr.isEmpty()) {
+                                    Date(0) // epoch as fallback for empty date
+                                } else {
+                                    SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).parse(dateStr) ?: Date(0)
+                                }
                             }
                         GradientHeader(
                             text = "Smart Suggestions",
