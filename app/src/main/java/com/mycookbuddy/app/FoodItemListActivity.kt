@@ -29,6 +29,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.foundation.clickable
 
 class FoodItemListActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -127,7 +128,7 @@ fun FoodItemListScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 4.dp),            // no clickable here
                         shape = RoundedCornerShape(12.dp),
                         elevation = CardDefaults.cardElevation(6.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.Transparent)
@@ -147,41 +148,28 @@ fun FoodItemListScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 modifier = Modifier.fillMaxWidth()
                             ) {
+                                // Only the Text is clickable now:
                                 Text(
                                     item.name,
                                     style = MaterialTheme.typography.titleMedium,
-                                    modifier = Modifier.weight(1f)
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onClick(item.name) }
                                 )
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    IconButton(
-                                        onClick = {
-                                            onClick(item.name)
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Edit",
-                                            tint = Color(0xFF1976D2),
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
-
-                                    IconButton(
-                                        onClick = {
-                                            toDeleteId = id
-                                            showDialog = true
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = Color.Red,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                    }
+                                IconButton(
+                                    onClick = {
+                                        toDeleteId = id
+                                        showDialog = true
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete",
+                                        tint = Color.Red,
+                                        modifier = Modifier.size(20.dp)
+                                    )
                                 }
                             }
                         }
