@@ -263,7 +263,7 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Food item added successfully in your personal list.", color = Color.White, fontSize = 18.sp)
+                    Text("Food item added successfully.", color = Color.White, fontSize = 18.sp)
                 }
             }
         }
