@@ -105,7 +105,7 @@ fun fetchCommonFoodItems(
     userFoodTypes: List<String>,
     userCuisines: List<String>,
     lastVisibleDoc: DocumentSnapshot?,
-    pageSize: Long = 50,
+    pageSize: Long = 5,
     onResult: (List<Pair<String, CommonFoodItem>>, DocumentSnapshot?) -> Unit
 ) {
     val collection = db.collection("commonfooditem")
@@ -315,10 +315,10 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         userFoodTypes,
                         userCuisines,
                         null,
-                        50
+                        5
                     ) { common, lastDoc ->
                         val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
-                        commonItems = filtered.shuffled().take(15)
+                        commonItems = filtered.shuffled().take(2)
                         lastVisibleDoc = lastDoc
                         hasMore = lastDoc != null && common.isNotEmpty()
                         isLoading = false
@@ -336,10 +336,10 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             userFoodTypes,
             userCuisines,
             lastVisibleDoc,
-            50
+            5
         ) { common, lastDoc ->
             val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
-            val newItems = filtered.shuffled().take(15)
+            val newItems = filtered.shuffled().take(2)
             commonItems = commonItems + newItems
             lastVisibleDoc = lastDoc
             hasMore = lastDoc != null && common.isNotEmpty()
@@ -347,6 +347,19 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         }
     }
 
+    fun saveConsumptionHistory(
+        db: FirebaseFirestore,
+        foodItemId: String,
+        userEmail: String
+    ) {
+        val date = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+        val history = mapOf(
+            "date" to date,
+            "foodItemId" to foodItemId,
+            "userEmail" to userEmail
+        )
+        db.collection("consumptionhistory").add(history)
+    }
     fun confirmCommonFoodItemConsumption(
         commonFoodItem: CommonFoodItem
     ) {
@@ -363,7 +376,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 
         db.collection("fooditem")
             .add(foodItem)
-            .addOnSuccessListener {
+            .addOnSuccessListener { docRef ->
+                saveConsumptionHistory(db, docRef.id, userEmail)
                 Toast.makeText(context, "Food item added successfully!", Toast.LENGTH_SHORT).show()
                 fetchInitial() // Refresh the screen
             }
@@ -379,6 +393,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
         db.collection("fooditem").document(id)
             .update("lastConsumptionDate", today)
             .addOnSuccessListener {
+                saveConsumptionHistory(db, id, userEmail)
                 val meal = getMealTypeBasedOnTime().first()
                 val itemName =
                     filteredPersonalItems.find { it.first == id }?.second?.name ?: "your meal"
