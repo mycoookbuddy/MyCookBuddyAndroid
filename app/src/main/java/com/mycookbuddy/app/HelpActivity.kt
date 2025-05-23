@@ -7,7 +7,6 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -69,7 +68,7 @@ class HelpActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(150.dp), // Makes the TextField initially look big
-                    maxLines = 5
+                    maxLines = 50
                 )
 
                 Button(

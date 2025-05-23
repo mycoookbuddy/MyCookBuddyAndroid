@@ -205,17 +205,27 @@ fun FoodItemsGrid(
                         .fillMaxSize()
                         .padding(2.dp)
                 ) {
-                    Text(
-                        text = item.name,
-                        style = MaterialTheme.typography.titleMedium,
+                    Column(
                         modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .fillMaxWidth(),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                            .align(Alignment.TopStart) // This works because it's inside BoxScope
+                            .fillMaxWidth()
+                            .padding(top = 4.dp, start = 4.dp, end = 4.dp)
+                    ) {
+                        Text(
+                            text = item.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = if (item.lastConsumptionDate.isBlank()) "Never consumed" else "Consumed On: ${item.lastConsumptionDate}",                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.Gray,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     Button(
-                        onClick = { onConfirm(id) }, // or onConfirm(id) for FoodItemsGrid
+                        onClick = { onConfirm(id) },
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(bottom = 2.dp)
@@ -526,7 +536,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         )
                     }
                 GradientHeader(
-                    text = "Popular Recipes",
+                    text = "Popular Menus",
                     modifier = Modifier.padding(top = 12.dp)
                 )
 
