@@ -110,7 +110,6 @@ fun fetchCommonFoodItemsUntilMatch(
     maxPages: kotlin.Int, // Prevent infinite loop
     onResult: (kotlin.collections.List<kotlin.Pair<kotlin.String, com.mycookbuddy.app.CommonFoodItem>>, com.google.firebase.firestore.DocumentSnapshot?) -> kotlin.Unit
 ) {
-    var collectedItems = listOf<Pair<String, CommonFoodItem>>()
     var currentLastDoc = lastVisibleDoc
     var pagesFetched = 0
 
@@ -119,10 +118,10 @@ fun fetchCommonFoodItemsUntilMatch(
             db, userFoodTypes, userCuisines, currentLastDoc, pageSize
         ) { items, lastDoc ->
             val filtered = filterCommonItemsNotInFoodItems(items, allPersonalItems)
-            collectedItems = collectedItems + filtered
-            val matching = collectedItems.filter { it.second.eatingTypes.any { t -> t in selectedEatingTypes } }
+
+            val matching = filtered.filter { it.second.eatingTypes.any { t -> t in selectedEatingTypes } }
             if (matching.isNotEmpty() || lastDoc == null || pagesFetched >= maxPages) {
-                onResult(matching, lastDoc)
+                onResult(filtered, lastDoc)
             } else {
                 currentLastDoc = lastDoc
                 pagesFetched++
@@ -287,9 +286,9 @@ fun GradientHeader(text: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
-    val pageSize = 2
+    val pageSize = 5
     val maxPages = 10
-    val shuffleCount = 1
+    val shuffleCount = 2
 
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
@@ -367,7 +366,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                         pageSize,
                         maxPages
                     ) { matching, lastDoc ->
-                        commonItems = matching.shuffled().take(shuffleCount)
+                        commonItems = commonItems + matching.shuffled().take(shuffleCount)
                         lastVisibleDoc = lastDoc
                         hasMore = lastDoc != null && matching.isNotEmpty()
                         isLoading = false
@@ -390,8 +389,7 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
             pageSize,
             maxPages
         ) { matching, lastDoc ->
-            val newItems = matching.shuffled().take(shuffleCount)
-            commonItems = commonItems + newItems
+            commonItems = commonItems + matching.shuffled().take(shuffleCount)
             lastVisibleDoc = lastDoc
             hasMore = lastDoc != null && matching.isNotEmpty()
             isLoadingMore = false
