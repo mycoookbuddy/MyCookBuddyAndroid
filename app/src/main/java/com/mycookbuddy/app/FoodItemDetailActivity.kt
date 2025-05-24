@@ -9,10 +9,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Fastfood
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
@@ -25,10 +27,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.mycookbuddy.app.Utils.Companion.refreshHomeScreen
+import com.mycookbuddy.app.component.CheckboxGroup
+import com.mycookbuddy.app.component.SegmentedControl
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.delay
 import java.util.*
 
 class FoodItemDetailActivity : ComponentActivity() {
@@ -86,7 +92,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                                 .document(documentId)
                                 .set(foodItem)
                                 .addOnSuccessListener {
-                                    Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
+//                                    Toast.makeText(this, "Food item updated successfully", Toast.LENGTH_SHORT).show()
                                     refreshHomeScreen(this, true)
                                     setResult(RESULT_OK)
                                     finish()
@@ -100,7 +106,7 @@ class FoodItemDetailActivity : ComponentActivity() {
                             firestore.collection("fooditem")
                                 .add(newFoodItem)
                                 .addOnSuccessListener {
-                                    Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
+//                                    Toast.makeText(this, "Food item saved successfully", Toast.LENGTH_SHORT).show()
                                     refreshHomeScreen(this, true)
                                     setResult(RESULT_OK)
                                     finish()
@@ -121,7 +127,7 @@ class FoodItemDetailActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FoodItemDetailScreen(
     userEmail: String,
@@ -135,162 +141,217 @@ fun FoodItemDetailScreen(
     var eatingType by remember { mutableStateOf(setOf<String>()) }
     var selectedType by remember { mutableStateOf("") }
     var showLoading by remember { mutableStateOf(false) }
+    var showSuccess by remember { mutableStateOf(false) }
     var repeatAfterText by remember { mutableStateOf(foodItem.repeatAfter?.toString() ?: "") }
 
     val calendar = Calendar.getInstance()
     val datePickerDialog = DatePickerDialog(
         context,
-        { _, year, month, dayOfMonth ->
-            lastConsumptionDate = "$dayOfMonth/${month + 1}/$year"
+        { _, year, month, day ->
+            lastConsumptionDate = "$day/${month + 1}/$year"
             foodItem = foodItem.copy(lastConsumptionDate = lastConsumptionDate)
         },
         calendar.get(Calendar.YEAR),
         calendar.get(Calendar.MONTH),
         calendar.get(Calendar.DAY_OF_MONTH)
-    )
-    datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
+    ).apply { datePicker.maxDate = System.currentTimeMillis() }
+
+    LaunchedEffect(showSuccess) {
+        if (showSuccess) {
+            delay(1200)
+            (context as? ComponentActivity)?.finish()
+        }
+    }
+
     LaunchedEffect(foodItemName) {
-        val firestore = FirebaseFirestore.getInstance()
-        firestore.collection("fooditem")
+        FirebaseFirestore.getInstance()
+            .collection("fooditem")
             .whereEqualTo("userEmail", userEmail)
             .whereEqualTo("name", foodItemName)
             .get()
             .addOnSuccessListener { result ->
                 result.documents.firstOrNull()?.data?.let { data ->
+                    val types = (data["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList()
+                    val repeat = (data["repeatAfter"] as? Long)?.toInt() ?: 0
                     foodItem = FoodItem(
                         name = data["name"] as? String ?: "",
                         userEmail = data["userEmail"] as? String ?: "",
                         type = data["type"] as? String ?: "",
-                        eatingTypes = (data["eatingTypes"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                        eatingTypes = types,
                         lastConsumptionDate = data["lastConsumptionDate"] as? String ?: "",
-                        repeatAfter = (data["repeatAfter"] as? Long)?.toInt() ?: 0
+                        repeatAfter = repeat
                     )
                     lastConsumptionDate = foodItem.lastConsumptionDate
-                    eatingType = foodItem.eatingTypes.toSet()
+                    eatingType = types.toSet()
                     selectedType = foodItem.type
-                    repeatAfterText = foodItem.repeatAfter?.toString() ?: ""
+                    repeatAfterText = repeat.toString()
                 }
             }
-            .addOnFailureListener { e ->
-                Log.e("Firestore", "Error fetching food item details", e)
-            }
+            .addOnFailureListener { Log.e("Firestore", "Error fetching food item details", it) }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Edit Food Item", color = Color.White) },
-                navigationIcon = {
-                    IconButton(onClick = { (context as? ComponentActivity)?.finish() }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                },
-                modifier = Modifier.background(
-                    Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA)))
-                ),
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent)
-            )
-        },
-        floatingActionButton = {
-            if (!showLoading) {
-                FloatingActionButton(
-                    onClick = {
-                        onLoadingChange(true)
-                        onSaveClick(foodItem)
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Edit Food Item", color = Color.White) },
+                    navigationIcon = {
+                        IconButton(onClick = { (context as? ComponentActivity)?.finish() }) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        }
                     },
-                    containerColor = Color(0xFF26C6DA),
-                    shape = CircleShape
-                ) {
-                    Icon(Icons.Default.Save, contentDescription = "Save", tint = Color.White)
+                    colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Color.Transparent),
+                    modifier = Modifier.background(
+                        Brush.horizontalGradient(listOf(Color(0xFF00ACC1), Color(0xFF26C6DA)))
+                    )
+                )
+            }
+        ) { padding ->
+            Column(
+                Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                if (!showLoading) {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            elevation = CardDefaults.cardElevation(8.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                        ) {
+                            Box(
+                                Modifier
+                                    .background(
+                                        Brush.horizontalGradient(
+                                            listOf(Color(0xFF42A5F5), Color(0xFF26C6DA))
+                                        )
+                                    )
+                                    .padding(16.dp)
+                            ) {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    OutlinedTextField(
+                                        value = foodItem.name,
+                                        onValueChange = { foodItem = foodItem.copy(name = it) },
+                                        label = { Text("Food Name", color = Color.White) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Fastfood, contentDescription = null, tint = Color.White)
+                                        },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Text("Select Type", color = Color.White, fontSize = 16.sp)
+                                    SegmentedControl(
+                                        options = listOf("Veg", "Non Veg", "Eggy", "Vegan"),
+                                        selectedOption = selectedType,
+                                        onOptionSelected = {
+                                            selectedType = it
+                                            foodItem = foodItem.copy(type = it)
+                                        },
+                                        columns = 2,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                    )
+
+                                    Text("Meal Preferences", color = Color.White, fontSize = 16.sp)
+                                    CheckboxGroup(
+                                        options = listOf("Breakfast", "Lunch", "Dinner"),
+                                        selectedOptions = eatingType,
+                                        onOptionToggle = { meal ->
+                                            eatingType = eatingType.toggle(meal)
+                                            foodItem = foodItem.copy(eatingTypes = eatingType.toList())
+                                        },
+                                        columns = 1,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                    )
+
+                                    OutlinedTextField(
+                                        value = repeatAfterText,
+                                        onValueChange = {
+                                            if (it.all(Char::isDigit)) {
+                                                repeatAfterText = it
+                                                foodItem = foodItem.copy(repeatAfter = it.toIntOrNull())
+                                            }
+                                        },
+                                        label = { Text("Repeat After (days)", color = Color.White) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White)
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Spacer(Modifier.padding(start = 8.dp))
+                                        Text("Last Consumed On:", color = Color.White)
+                                        Spacer(Modifier.padding(start = 8.dp))
+                                        Button(
+                                            onClick = { datePickerDialog.show() },
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White.copy(alpha = 0.8f))
+                                        ) {
+                                            Text(
+                                                if (lastConsumptionDate.isEmpty()) "Choose date" else lastConsumptionDate,
+                                                color = Color(0xFF26C6DA)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = {
+                            showLoading = true
+                            onSaveClick(foodItem)
+                            showSuccess = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF26C6DA))
+                    ) {
+                        Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.padding(start = 8.dp))
+                        Text("Save", color = Color.White)
+                    }
                 }
             }
         }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            if (showLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else {
-                OutlinedTextField(
-                    value = foodItem.name,
-                    onValueChange = { foodItem = foodItem.copy(name = it) },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Fastfood, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Food Name")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
 
-                Text("Select Type", style = MaterialTheme.typography.titleMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    listOf("Veg", "Non Veg", "Eggy", "Vegan").forEach { type ->
-                        AssistChip(
-                            onClick = {
-                                selectedType = type
-                                foodItem = foodItem.copy(type = type)
-                            },
-                            label = { Text(type) },
-                            shape = CircleShape,
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = if (selectedType == type) Color(0xFFB2EBF2) else Color.White
-                            )
-                        )
-                    }
-                }
-
-                Text("Meal Preferences", style = MaterialTheme.typography.titleMedium)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    listOf("Breakfast", "Lunch", "Dinner").forEach { type ->
-                        ElevatedFilterChip(
-                            selected = eatingType.contains(type),
-                            onClick = {
-                                eatingType = if (eatingType.contains(type)) eatingType - type else eatingType + type
-                                foodItem = foodItem.copy(eatingTypes = eatingType.toList())
-                            },
-                            label = { Text(type) }
-                        )
-                    }
-                }
-
-                OutlinedTextField(
-                    value = repeatAfterText,
-                    onValueChange = {
-                        // Only update if input is empty or numeric
-                        if (it.isEmpty() || it.all { char -> char.isDigit() }) {
-                            repeatAfterText = it
-                            foodItem = foodItem.copy(repeatAfter = it.toIntOrNull())
-                        }
-                    },
-                    label = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Spacer(Modifier.width(6.dp))
-                            Text("Repeat After (days)")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
-                )
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Last Consumed On", modifier = Modifier.padding(end = 8.dp))
-                    Button(
-                        onClick = { datePickerDialog.show() },
-
+        if (showSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Card(
+                        shape = CircleShape,
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(10.dp),
+                        modifier = Modifier.size(120.dp)
                     ) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (lastConsumptionDate.isEmpty()) "Choose date" else lastConsumptionDate)
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = "Success",
+                                tint = Color(0xFF4CAF50),
+                                modifier = Modifier.size(64.dp)
+                            )
+                        }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Food item saved successfully", color = Color.White, fontSize = 18.sp)
                 }
             }
         }
     }
 }
+
+private fun <T> Set<T>.toggle(item: T): Set<T> = if (contains(item)) minus(item) else plus(item)
