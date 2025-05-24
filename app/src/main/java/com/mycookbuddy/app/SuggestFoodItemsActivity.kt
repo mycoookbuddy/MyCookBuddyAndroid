@@ -99,13 +99,46 @@ fun fetchPersonalFoodItems(
 }
 
 // --- PAGINATED COMMON FOOD FETCH ---
+fun fetchCommonFoodItemsUntilMatch(
+    db: com.google.firebase.firestore.FirebaseFirestore,
+    userFoodTypes: kotlin.collections.List<kotlin.String>,
+    userCuisines: kotlin.collections.List<kotlin.String>,
+    allPersonalItems: kotlin.collections.List<kotlin.Pair<kotlin.String, com.mycookbuddy.app.FoodItem>>,
+    selectedEatingTypes: kotlin.collections.Set<kotlin.String>,
+    lastVisibleDoc: com.google.firebase.firestore.DocumentSnapshot?,
+    pageSize: kotlin.Int,
+    maxPages: kotlin.Int, // Prevent infinite loop
+    onResult: (kotlin.collections.List<kotlin.Pair<kotlin.String, com.mycookbuddy.app.CommonFoodItem>>, com.google.firebase.firestore.DocumentSnapshot?) -> kotlin.Unit
+) {
+    var collectedItems = listOf<Pair<String, CommonFoodItem>>()
+    var currentLastDoc = lastVisibleDoc
+    var pagesFetched = 0
+
+    fun fetchNextPage() {
+        fetchCommonFoodItems(
+            db, userFoodTypes, userCuisines, currentLastDoc, pageSize
+        ) { items, lastDoc ->
+            val filtered = filterCommonItemsNotInFoodItems(items, allPersonalItems)
+            collectedItems = collectedItems + filtered
+            val matching = collectedItems.filter { it.second.eatingTypes.any { t -> t in selectedEatingTypes } }
+            if (matching.isNotEmpty() || lastDoc == null || pagesFetched >= maxPages) {
+                onResult(matching, lastDoc)
+            } else {
+                currentLastDoc = lastDoc
+                pagesFetched++
+                fetchNextPage()
+            }
+        }
+    }
+    fetchNextPage()
+}
 
 fun fetchCommonFoodItems(
     db: FirebaseFirestore,
     userFoodTypes: List<String>,
     userCuisines: List<String>,
     lastVisibleDoc: DocumentSnapshot?,
-    pageSize: Long = 5,
+    pageSize: Int,
     onResult: (List<Pair<String, CommonFoodItem>>, DocumentSnapshot?) -> Unit
 ) {
     val collection = db.collection("commonfooditem")
@@ -117,7 +150,7 @@ fun fetchCommonFoodItems(
             .whereIn("type", userFoodTypes.take(10))
             .whereArrayContainsAny("cuisines", userCuisines.take(10))
     }
-    query = query.limit(pageSize)
+    query = query.limit(pageSize.toLong())
     if (lastVisibleDoc != null) {
         query = query.startAfter(lastVisibleDoc)
     }
@@ -254,6 +287,10 @@ fun GradientHeader(text: String, modifier: Modifier = Modifier) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
+    val pageSize = 2
+    val maxPages = 10
+    val shuffleCount = 1
+
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     rememberCoroutineScope()
@@ -319,18 +356,20 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
                 allPersonalItems = personal
                 filterEligiblePersonalFoodItemsForSuggestion(personal) { personalFiltered ->
                     filteredPersonalItems = personalFiltered
-                    // Fetch first page of common items
-                    fetchCommonFoodItems(
+                    // Use fetchCommonFoodItemsUntilMatch here
+                    fetchCommonFoodItemsUntilMatch(
                         db,
                         userFoodTypes,
                         userCuisines,
+                        allPersonalItems,
+                        selectedEatingTypes,
                         null,
-                        5
-                    ) { common, lastDoc ->
-                        val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
-                        commonItems = filtered.shuffled().take(2)
+                        pageSize,
+                        maxPages
+                    ) { matching, lastDoc ->
+                        commonItems = matching.shuffled().take(shuffleCount)
                         lastVisibleDoc = lastDoc
-                        hasMore = lastDoc != null && common.isNotEmpty()
+                        hasMore = lastDoc != null && matching.isNotEmpty()
                         isLoading = false
                     }
                 }
@@ -341,18 +380,20 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
     fun fetchMore() {
         if (isLoadingMore || !hasMore) return
         isLoadingMore = true
-        fetchCommonFoodItems(
+        fetchCommonFoodItemsUntilMatch(
             db,
             userFoodTypes,
             userCuisines,
+            allPersonalItems,
+            selectedEatingTypes,
             lastVisibleDoc,
-            5
-        ) { common, lastDoc ->
-            val filtered = filterCommonItemsNotInFoodItems(common, allPersonalItems)
-            val newItems = filtered.shuffled().take(2)
+            pageSize,
+            maxPages
+        ) { matching, lastDoc ->
+            val newItems = matching.shuffled().take(shuffleCount)
             commonItems = commonItems + newItems
             lastVisibleDoc = lastDoc
-            hasMore = lastDoc != null && common.isNotEmpty()
+            hasMore = lastDoc != null && matching.isNotEmpty()
             isLoadingMore = false
         }
     }
@@ -438,6 +479,8 @@ fun SuggestFoodItemsScreen(userEmail: String, userName: String) {
 
     // Fetch data only once
     LaunchedEffect(Unit) {
+        if (selectedEatingTypes.isEmpty())
+            selectedEatingTypes = getMealTypeBasedOnTime()
         fetchInitial()
     }
 
