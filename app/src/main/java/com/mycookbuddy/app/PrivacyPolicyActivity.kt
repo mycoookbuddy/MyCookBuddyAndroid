@@ -68,14 +68,12 @@ class PrivacyPolicyActivity : ComponentActivity() {
     @Composable
     fun PrivacyPolicyScreen(onNext: () -> Unit, onViewPrivacyPolicy: () -> Unit) {
         var agreed by remember { mutableStateOf(false) }
-        var marketingOptIn by remember { mutableStateOf(true) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.White)
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+                .padding(16.dp)
         ) {
             Card(
                 modifier = Modifier.fillMaxSize(),
@@ -86,51 +84,61 @@ class PrivacyPolicyActivity : ComponentActivity() {
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp),
-                    verticalArrangement = Arrangement.SpaceBetween
+                    verticalArrangement = Arrangement.SpaceBetween,
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        Text(
-                            text = "Sign In",
-                            color = Color.Black,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 14.sp,
-                            modifier = Modifier.align(Alignment.CenterHorizontally)
-                        )
-
-                        Text(
-                            text = "Before you continue",
-                            color = Color.Black,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 28.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Text(
-                            text = buildAnnotatedString {
-                                append("Please read and agree to MyCookBuddy ")
-                                withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
-                                    append("Privacy Policy")
-                                }
-                            },
-                            modifier = Modifier.clickable { onViewPrivacyPolicy() },
-                            color = Color.DarkGray,
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Start
-                        )
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(
-                                checked = agreed,
-                                onCheckedChange = { agreed = it },
-                                colors = CheckboxDefaults.colors(checkedColor = Color.Black)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f)) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.align(Alignment.Center)
+                        ) {
                             Text(
-                                text = "I agree to MyCookBuddy Terms & Conditions and Privacy Policy",
+                                text = "Sign In",
                                 color = Color.Black,
+                                fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp
                             )
+
+                            Text(
+                                text = "Before you continue",
+                                color = Color.Black,
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 28.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Text(
+                                text = buildAnnotatedString {
+                                    append("Please read and agree to MyCookBuddy ")
+                                    withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
+                                        append("Privacy Policy")
+                                    }
+                                },
+                                modifier = Modifier.clickable { onViewPrivacyPolicy() },
+                                color = Color.DarkGray,
+                                fontSize = 14.sp,
+                                textAlign = TextAlign.Center
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Checkbox(
+                                    checked = agreed,
+                                    onCheckedChange = { agreed = it },
+                                    colors = CheckboxDefaults.colors(checkedColor = Color.Black)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "I agree to MyCookBuddy Terms & Conditions and Privacy Policy",
+                                    color = Color.Black,
+                                    fontSize = 14.sp
+                                )
+                            }
                         }
                     }
 
