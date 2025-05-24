@@ -60,6 +60,10 @@ dependencies {
     implementation("androidx.compose.material3:material3:1.2.1")
     implementation("androidx.compose.ui:ui:1.5.0")
     implementation("androidx.compose.ui:ui-text-google-fonts:1.5.4")
+    implementation("com.airbnb.android:lottie-compose:6.0.0")
+    implementation("com.google.accompanist:accompanist-pager:0.30.1")
+
+
 
 
     // Firebase and Auth

@@ -7,20 +7,26 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -30,12 +36,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-
 class PrivacyPolicyActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            PrivacyPolicyContent()
+            MaterialTheme(colorScheme = lightColorScheme()) {
+                PrivacyPolicyContent()
+            }
         }
     }
 
@@ -47,65 +54,101 @@ class PrivacyPolicyActivity : ComponentActivity() {
         NavHost(navController = navController, startDestination = "privacy_policy") {
             composable("privacy_policy") {
                 PrivacyPolicyScreen(
-                    onNext = {
-                        saveUserToFirestore(context)
-
-                    },
-                    onViewPrivacyPolicy = {
-                        navController.navigate("html_webview")
-                    }
+                    onNext = { saveUserToFirestore(context) },
+                    onViewPrivacyPolicy = { navController.navigate("html_webview") }
                 )
             }
             composable("html_webview") {
-                val htmlContent = loadHtmlFromAssets(
-                    context = LocalContext.current,
-                    fileName = "privacy_policy.html"
-                )
-                HtmlWebViewWithClose(
-                    htmlContent = htmlContent,
-                    onClose = { navController.popBackStack() }
-                )
+                val htmlContent = loadHtmlFromAssets(context, "privacy_policy.html")
+                HtmlWebViewWithClose(htmlContent = htmlContent) { navController.popBackStack() }
             }
         }
     }
 
     @Composable
-    fun PrivacyPolicyScreen(
-        onNext: () -> Unit, // Changed from @Composable () -> Unit to () -> Unit
-        onViewPrivacyPolicy: () -> Unit
-    ) {
-        var isChecked by remember { mutableStateOf(false) }
+    fun PrivacyPolicyScreen(onNext: () -> Unit, onViewPrivacyPolicy: () -> Unit) {
+        var agreed by remember { mutableStateOf(false) }
+        var marketingOptIn by remember { mutableStateOf(true) }
 
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
+                .background(Color.White)
                 .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+            contentAlignment = Alignment.Center
         ) {
-            Column {
-                Text("Privacy Policy", style = MaterialTheme.typography.headlineMedium)
-                Spacer(modifier = Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = isChecked,
-                        onCheckedChange = { isChecked = it }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("I accept the privacy policy", style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "View Privacy Policy",
-                    style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.primary),
-                    modifier = Modifier.clickable { onViewPrivacyPolicy() }
-                )
-            }
-            Button(
-                onClick = onNext, // This now works correctly
-                enabled = isChecked,
-                modifier = Modifier.fillMaxWidth()
+            Card(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
             ) {
-                Text("Next")
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                        Text(
+                            text = "Sign In",
+                            color = Color.Black,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+
+                        Text(
+                            text = "Before you continue",
+                            color = Color.Black,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 28.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Text(
+                            text = buildAnnotatedString {
+                                append("Please read and agree to MyCookBuddy ")
+                                withStyle(style = SpanStyle(textDecoration = TextDecoration.Underline, color = Color.Blue)) {
+                                    append("Privacy Policy")
+                                }
+                            },
+                            modifier = Modifier.clickable { onViewPrivacyPolicy() },
+                            color = Color.DarkGray,
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Start
+                        )
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = agreed,
+                                onCheckedChange = { agreed = it },
+                                colors = CheckboxDefaults.colors(checkedColor = Color.Black)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "I agree to MyCookBuddy Terms & Conditions and Privacy Policy",
+                                color = Color.Black,
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = onNext,
+                        enabled = agreed,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (agreed) Color.Black else Color.Gray,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("Continue", fontWeight = FontWeight.Medium)
+                    }
+                }
             }
         }
     }
@@ -126,10 +169,7 @@ class PrivacyPolicyActivity : ComponentActivity() {
                     .align(Alignment.TopEnd)
                     .padding(16.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close"
-                )
+                Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.Black)
             }
         }
     }
@@ -147,25 +187,13 @@ class PrivacyPolicyActivity : ComponentActivity() {
         val account = GoogleSignIn.getLastSignedInAccount(context)
         val userName = account?.displayName
         val userEmail = account?.email ?: return
-        // Define the default notifications
 
         val defaultNotifications = listOf(
-            mapOf(
-                "mealType" to "Breakfast",
-                "status" to true,
-                "timestamp" to "7:30 AM"
-            ),
-            mapOf(
-                "mealType" to "Lunch",
-                "status" to true,
-                "timestamp" to "01:30 PM"
-            ),
-            mapOf(
-                "mealType" to "Dinner",
-                "status" to true,
-                "timestamp" to "7:30 PM"
-            )
+            mapOf("mealType" to "Breakfast", "status" to true, "timestamp" to "7:30 AM"),
+            mapOf("mealType" to "Lunch", "status" to true, "timestamp" to "01:30 PM"),
+            mapOf("mealType" to "Dinner", "status" to true, "timestamp" to "7:30 PM")
         )
+
         val user = mutableMapOf<String, Any>(
             "name" to (userName ?: "User"),
             "email" to userEmail,
@@ -177,12 +205,11 @@ class PrivacyPolicyActivity : ComponentActivity() {
             .set(user)
             .addOnSuccessListener {
                 Log.d("Firestore", "User data successfully saved!")
-                setResult(RESULT_OK) // Notify MainActivity that saving is done
-                finish() // Close PrivacyPolicyActivity
+                setResult(RESULT_OK)
+                finish()
             }
             .addOnFailureListener { e ->
                 Log.e("Firestore", "Error saving user data", e)
             }
     }
-
 }
