@@ -6,11 +6,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -27,9 +23,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.airbnb.lottie.compose.*
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mycookbuddy.app.component.CheckboxGroup
@@ -63,15 +59,6 @@ class AddFoodItemActivity : ComponentActivity() {
                 if (result.documents.isNotEmpty()) {
                     Toast.makeText(this, "Food item already exists", Toast.LENGTH_SHORT).show()
                 } else {
-                    val foodItemData = hashMapOf(
-                        "name" to foodItem.name,
-                        "type" to foodItem.type,
-                        "eatingTypes" to foodItem.eatingTypes,
-                        "lastConsumptionDate" to foodItem.lastConsumptionDate,
-                        "repeatAfter" to foodItem.repeatAfter,
-                        "userEmail" to userEmail
-                    )
-
                     firestore.collection("fooditem")
                         .add(foodItem.copy(userEmail = userEmail))
                         .addOnSuccessListener { documentReference ->
@@ -107,6 +94,8 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
     var repeatAfter by remember { mutableStateOf("") }
     var showLoading by remember { mutableStateOf(false) }
     var showSuccess by remember { mutableStateOf(false) }
+
+    val successLottie by rememberLottieComposition(LottieCompositionSpec.Asset("success_animation.json"))
 
     LaunchedEffect(showSuccess) {
         if (showSuccess) {
@@ -247,21 +236,11 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Card(
-                        shape = CircleShape,
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(10.dp),
-                        modifier = Modifier.size(120.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "Success",
-                                tint = Color(0xFF4CAF50),
-                                modifier = Modifier.size(64.dp)
-                            )
-                        }
-                    }
+                    LottieAnimation(
+                        composition = successLottie,
+                        iterations = 1,
+                        modifier = Modifier.size(160.dp)
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("Food item added successfully.", color = Color.White, fontSize = 18.sp)
                 }
@@ -271,4 +250,3 @@ fun AddFoodItemScreen(userEmail: String, onSaveClick: (FoodItem) -> Unit) {
 }
 
 private fun <T> Set<T>.toggle(item: T): Set<T> = if (contains(item)) minus(item) else plus(item)
-
