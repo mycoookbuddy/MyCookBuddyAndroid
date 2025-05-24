@@ -4,17 +4,12 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
@@ -23,215 +18,182 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.airbnb.lottie.compose.*
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import com.mycookbuddy.app.ui.theme.MyApplicationTheme
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class OnboardingActivity : ComponentActivity() {
     private val firestore = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val user = GoogleSignIn.getLastSignedInAccount(this)
-        val userEmail = user?.email
+        val userEmail = GoogleSignIn.getLastSignedInAccount(this)?.email ?: "unknown@example.com"
 
         setContent {
             MyApplicationTheme {
-                SettingsScreen(
-                    onNext = { selectedCuisines, selectedFoodTypes ->
-                        userEmail?.let { savePreferences(it, selectedCuisines, selectedFoodTypes) }
-                    }
-                )
+                OnboardingPreferenceScreen(userEmail) { cuisines, foodTypes ->
+                    savePreferences(userEmail, cuisines, foodTypes)
+                }
             }
         }
     }
 
-    private fun savePreferences(
-        userEmail: String,
-        selectedCuisines: List<String>,
-        selectedFoodTypes: List<String>
-    ) {
+    private fun savePreferences(userEmail: String, selectedCuisines: List<String>, selectedFoodTypes: List<String>) {
         val userPreferences = mapOf(
             "preferences" to "SET",
             "cuisines" to selectedCuisines,
             "foodTypes" to selectedFoodTypes
         )
-
-        // Save preferences directly to the /users collection
         firestore.collection("users").document(userEmail)
             .set(userPreferences, SetOptions.merge())
             .addOnSuccessListener {
-                Toast.makeText(
-                    this,
-                    "Preferences saved successfully",
-                    Toast.LENGTH_SHORT
-                ).show()
-                setResult(RESULT_OK) // Notify MainActivity that saving is done
+                Toast.makeText(this, "Preferences saved successfully", Toast.LENGTH_SHORT).show()
+                setResult(RESULT_OK)
                 finish()
             }
-            .addOnFailureListener { e ->
-                Toast.makeText(
-                    this,
-                    "Failed to save preferences: ${e.message}",
-                    Toast.LENGTH_SHORT
-                ).show()
+            .addOnFailureListener {
+                Toast.makeText(this, "Failed to save preferences", Toast.LENGTH_SHORT).show()
             }
     }
-    @Composable
-    fun SelectableItem(
-        title: String,
-        selected: Boolean,
-        onToggle: () -> Unit,
-        selectedColor: Color
-    ) {
-        val interactionSource = remember { MutableInteractionSource() }
-        val isHovered by interactionSource.collectIsHoveredAsState()
-        val isPressed by interactionSource.collectIsPressedAsState()
+}
 
-        val animatedColor by animateColorAsState(
-            targetValue = if (selected) selectedColor else if (isHovered) Color(0xFFE0E0E0) else Color(
-                0xFFF4F4F4
-            ),
-            animationSpec = tween(300), label = ""
-        )
+@Composable
+fun OnboardingPreferenceScreen(userEmail: String, onSave: (List<String>, List<String>) -> Unit) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val successLottie by rememberLottieComposition(LottieCompositionSpec.Asset("success_animation.json"))
 
-        val scale by animateFloatAsState(
-            targetValue = if (isPressed) 0.97f else if (selected) 1.05f else 1.0f,
-            animationSpec = tween(150), label = ""
-        )
+    var cuisines by remember { mutableStateOf(listOf("South Indian", "Bengali", "Punjabi", "Marathi", "Gujrati")) }
+    var selectedCuisines by remember { mutableStateOf(setOf<String>()) }
+    var selectedFoodTypes by remember { mutableStateOf(setOf<String>()) }
+    var showSuccess by remember { mutableStateOf(false) }
 
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .scale(scale)
-                .clickable(interactionSource = interactionSource, indication = null) { onToggle() },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = animatedColor)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(16.dp)
-            ) {
+    fun toggle(set: Set<String>, value: String): Set<String> = if (value in set) set - value else set + value
 
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(
-                    title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Medium
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                Checkbox(
-                    checked = selected,
-                    onCheckedChange = { onToggle() }
-                )
-            }
-        }
-    }
-
-    @Composable
-    fun SettingsScreen(
-        onNext: (List<String>, List<String>) -> Unit,
-    ) {
-        val firestore = FirebaseFirestore.getInstance()
-        var cuisines by remember { mutableStateOf<List<String>>(emptyList()) }
-        val selectedCuisines = remember { mutableStateListOf<String>() }
-        val selectedFoodTypes = remember { mutableStateListOf<String>() }
-
-        val foodTypeIcons = mapOf(
-            "Veg" to R.drawable.vegetarian_4x,
-            "Non Veg" to R.drawable.non_vegetarian_4x,
-            "Eggy" to R.drawable.eggetarian_4x,
-            "Vegan" to R.drawable.vegan_4x
-        )
-
-        val foodTypeColors = mapOf(
-            "Veg" to Color(0xFFC8E6C9),
-            "Non Veg" to Color(0xFFFFCDD2),
-            "Eggy" to Color(0xFFFFF9C4),
-            "Vegan" to Color(0xFFDCEDC8)
-        )
-
-        LaunchedEffect(Unit) {
-            // Fetch cuisines and select all by default
-            firestore.collection("cuisine").get()
-                .addOnSuccessListener { results ->
-                    cuisines = results.documents.mapNotNull { doc ->
-                        doc.getString("name")
-                    }
-                 //   selectedCuisines.addAll(cuisines) // Select all cuisines by default
-                }
-
-            // Select all food types by default
-         //   selectedFoodTypes.addAll(foodTypeIcons.keys)
-        }
-
+    Scaffold(topBar = {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .padding(top = 12.dp, bottom = 4.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                "Cuisine Preferences",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                text = "✨ Customize Your Taste!",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF4527A0),
+                textAlign = TextAlign.Center
             )
-
-            cuisines.forEach { cuisine ->
-                SelectableItem(
-                    title = cuisine,
-                    selected = selectedCuisines.contains(cuisine),
-                    onToggle = {
-                        if (selectedCuisines.contains(cuisine)) selectedCuisines.remove(cuisine)
-                        else selectedCuisines.add(cuisine)
-                    },
-                    selectedColor = Color(0xFFE1F5FE)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                "Food Type Preferences",
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-            )
-
-            foodTypeIcons.forEach { (type, icon) ->
-                SelectableItem(
-                    title = type,
-                    selected = selectedFoodTypes.contains(type),
-                    onToggle = {
-                        if (selectedFoodTypes.contains(type)) selectedFoodTypes.remove(type)
-                        else selectedFoodTypes.add(type)
-                    },
-                    selectedColor = foodTypeColors[type] ?: Color(0xFFF0F0F0)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                Button(
-                    onClick = {
-                        onNext(selectedCuisines.toList(), selectedFoodTypes.toList())
-                    },
-                    shape = RoundedCornerShape(20.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00ACC1))
+        }
+    }) { padding ->
+        Column(
+            Modifier
+                .padding(padding)
+                .padding(horizontal = 12.dp, vertical = 4.dp)
+                .fillMaxSize()
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("🍲 Cuisine Preferences", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF512DA8), modifier = Modifier.padding(bottom = 4.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFF3E5F5)
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = "Next", tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Next", color = Color.White)
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        cuisines.forEach { cuisine ->
+                            AnimatedPreferenceRow(
+                                title = cuisine,
+                                selected = selectedCuisines.contains(cuisine),
+                                onToggle = { selectedCuisines = toggle(selectedCuisines, cuisine) }
+                            )
+                        }
+                    }
                 }
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text("🥗 Food Type Preferences", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF512DA8), modifier = Modifier.padding(bottom = 4.dp))
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = Color(0xFFF3E5F5)
+                ) {
+                    Column(modifier = Modifier.padding(8.dp)) {
+                        listOf("Veg", "Non Veg", "Eggy", "Vegan").forEach { type ->
+                            AnimatedPreferenceRow(
+                                title = type,
+                                selected = selectedFoodTypes.contains(type),
+                                onToggle = { selectedFoodTypes = toggle(selectedFoodTypes, type) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = {
+                    if (selectedCuisines.isNotEmpty() && selectedFoodTypes.isNotEmpty()) {
+                        coroutineScope.launch {
+                            showSuccess = true
+                            delay(2000)
+                            onSave(selectedCuisines.toList(), selectedFoodTypes.toList())
+                            showSuccess = false
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C4DFF))
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Save Preferences", color = Color.White)
             }
         }
+
+        if (showSuccess) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    LottieAnimation(
+                        composition = successLottie,
+                        iterations = 1,
+                        modifier = Modifier.size(160.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Preferences saved successfully.", color = Color.White, fontSize = 18.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AnimatedPreferenceRow(title: String, selected: Boolean, onToggle: () -> Unit) {
+    val scale by animateFloatAsState(if (selected) 1.05f else 1f, label = "scaleAnim")
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .scale(scale)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(title, modifier = Modifier.weight(1f), fontSize = 15.sp)
+        Switch(checked = selected, onCheckedChange = { onToggle() })
     }
 }
